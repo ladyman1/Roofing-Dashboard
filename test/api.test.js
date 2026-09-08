@@ -167,7 +167,96 @@ async function runTests() {
   });
   const m9Reset = await db('monthly_budgets').where({ year: 2026, month: 9 }).first();
   assert.strictEqual(m9Reset.actual_sales, null, 'Actual sales should be reset to null');
-  console.log('✓ Entering Budget, Actual Sales, and Last Year figures for same month verified.');
+  // Test 11: Authentication & Default Admin Seeding
+  console.log('[TEST 11] Verifying Default Admin Seeding and Password Verification...');
+  const { hashPassword, verifyPassword, createToken, verifyToken, requireAuth, requireAdmin } = require('../src/services/auth');
+  const adminUser = await db('users').where({ username: 'admin' }).first();
+  assert.ok(adminUser, 'Default admin user must exist in database');
+  assert.strictEqual(adminUser.role, 'admin', 'Default admin user must have role "admin"');
+  assert.strictEqual(verifyPassword('admin123', adminUser.password_hash, adminUser.salt), true, 'Password "admin123" must verify');
+  assert.strictEqual(verifyPassword('wrongpassword', adminUser.password_hash, adminUser.salt), false, 'Wrong password must fail');
+  console.log('✓ Default admin credentials verified.');
+
+  // Test 12: Token Generation & Cryptographic Verification
+  console.log('[TEST 12] Verifying stateless HMAC-SHA256 Token creation & verification...');
+  const adminToken = createToken(adminUser);
+  assert.ok(typeof adminToken === 'string' && adminToken.split('.').length === 3, 'Token must be valid 3-part JWT format');
+  const verifiedPayload = verifyToken(adminToken);
+  assert.ok(verifiedPayload, 'Token must verify successfully');
+  assert.strictEqual(verifiedPayload.username, 'admin', 'Token payload must contain admin username');
+  assert.strictEqual(verifiedPayload.role, 'admin', 'Token payload must contain admin role');
+
+  // Tampered token test
+  const tamperedToken = adminToken.slice(0, -4) + 'abcd';
+  assert.strictEqual(verifyToken(tamperedToken), null, 'Tampered token must be rejected');
+  console.log('✓ Token cryptographic generation and tamper-detection verified.');
+
+  // Test 13: RBAC & User Management CRUD
+  console.log('[TEST 13] Verifying User Management (create viewer, assign password, RBAC middleware, delete)...');
+  // 1. Create Viewer
+  const { hash: vHash, salt: vSalt } = hashPassword('viewerPass1');
+  const [createdViewerId] = await db('users').insert({
+    username: 'testviewer',
+    password_hash: vHash,
+    salt: vSalt,
+    role: 'viewer',
+    full_name: 'Test Viewer',
+    is_active: true
+  }).returning('id');
+  const resolvedViewerId = typeof createdViewerId === 'object' ? createdViewerId.id : createdViewerId;
+
+  const viewerUser = await db('users').where({ id: resolvedViewerId }).first();
+  assert.strictEqual(viewerUser.username, 'testviewer', 'Viewer must be created');
+  assert.strictEqual(viewerUser.role, 'viewer', 'Role must be "viewer"');
+
+  // 2. Assign / Update Password
+  const { hash: vNewHash, salt: vNewSalt } = hashPassword('viewerNewPass2');
+  await db('users').where({ id: resolvedViewerId }).update({
+    password_hash: vNewHash,
+    salt: vNewSalt
+  });
+  const updatedViewer = await db('users').where({ id: resolvedViewerId }).first();
+  assert.strictEqual(verifyPassword('viewerNewPass2', updatedViewer.password_hash, updatedViewer.salt), true, 'New password must verify');
+  assert.strictEqual(verifyPassword('viewerPass1', updatedViewer.password_hash, updatedViewer.salt), false, 'Old password must fail');
+
+  // 3. RBAC Middleware verification
+  const viewerToken = createToken(updatedViewer);
+  const viewerPayload = verifyToken(viewerToken);
+  assert.strictEqual(viewerPayload.role, 'viewer');
+
+  // Mock middleware check for requireAdmin with viewer user
+  let adminForbidden = false;
+  const mockResAdmin = {
+    status: (code) => ({
+      json: (data) => {
+        if (code === 403) adminForbidden = true;
+      }
+    })
+  };
+  requireAdmin({ user: viewerPayload }, mockResAdmin, () => {
+    assert.fail('requireAdmin should not call next() for a viewer');
+  });
+  assert.strictEqual(adminForbidden, true, 'requireAdmin must return 403 Forbidden for viewer');
+
+  // Mock middleware check for requireAuth without token
+  let authUnauthorized = false;
+  const mockResAuth = {
+    status: (code) => ({
+      json: (data) => {
+        if (code === 401) authUnauthorized = true;
+      }
+    })
+  };
+  requireAuth({ headers: {} }, mockResAuth, () => {
+    assert.fail('requireAuth should not call next() when unauthenticated');
+  });
+  assert.strictEqual(authUnauthorized, true, 'requireAuth must return 401 Unauthorized when missing token');
+
+  // 4. Delete Viewer
+  await db('users').where({ id: resolvedViewerId }).del();
+  const deletedViewer = await db('users').where({ id: resolvedViewerId }).first();
+  assert.strictEqual(deletedViewer, undefined, 'Viewer must be deleted from database');
+  console.log('✓ User management and RBAC access protection verified.');
 
   console.log('--- ALL TESTS COMPLETED SUCCESSFULLY! ---');
 }

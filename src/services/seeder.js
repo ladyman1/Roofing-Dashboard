@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { db } = require('../db/knex');
 const { parseRoofingCsv } = require('./csvParser');
+const { hashPassword } = require('./auth');
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -52,7 +53,34 @@ async function seedMonthlyBudgets(force = false) {
   return { seeded: true, count: rows.length };
 }
 
+async function seedDefaultUsers(force = false) {
+  const countRes = await db('users').count('* as total').first();
+  const currentCount = parseInt(countRes ? (countRes.total || countRes['count(*)']) : 0, 10);
+  if (currentCount > 0 && !force) {
+    return { seeded: false, count: currentCount };
+  }
+
+  if (force && currentCount > 0) {
+    await db('users').del();
+  }
+
+  const { hash, salt } = hashPassword('admin123');
+  await db('users').insert({
+    username: 'admin',
+    password_hash: hash,
+    salt,
+    role: 'admin',
+    full_name: 'Administrator',
+    is_active: true
+  });
+  console.log('[SEED] Initial admin user seeded: username "admin"');
+  return { seeded: true, count: 1 };
+}
+
 async function seedInitialData(force = false) {
+  // Ensure default admin user is seeded
+  await seedDefaultUsers(force);
+
   // Always ensure budgets are seeded
   await seedMonthlyBudgets(force);
 
@@ -119,5 +147,6 @@ async function seedInitialData(force = false) {
 module.exports = {
   seedInitialData,
   seedMonthlyBudgets,
+  seedDefaultUsers,
   MONTH_NAMES
 };

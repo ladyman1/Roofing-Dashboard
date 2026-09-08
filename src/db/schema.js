@@ -102,6 +102,24 @@ async function initSchema() {
       console.log('[DB] Added column actual_margin_pct to monthly_budgets');
     }
   }
+
+  const hasUsers = await db.schema.hasTable('users');
+  if (!hasUsers) {
+    await db.schema.createTable('users', (table) => {
+      table.increments('id').primary();
+      table.string('username', 100).notNullable().unique();
+      table.string('password_hash', 255).notNullable();
+      table.string('salt', 100).notNullable();
+      table.string('role', 20).notNullable().defaultTo('viewer'); // 'admin' | 'viewer'
+      table.string('full_name', 150).nullable();
+      table.boolean('is_active').defaultTo(true);
+      table.timestamp('created_at').defaultTo(db.fn.now());
+      table.timestamp('updated_at').defaultTo(db.fn.now());
+
+      table.index(['username'], 'idx_users_username');
+    });
+    console.log('[DB] Created table: users');
+  }
 }
 
 module.exports = {

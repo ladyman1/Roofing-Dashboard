@@ -3,6 +3,13 @@ const multer = require('multer');
 const { db, getDbDialect, isPg } = require('../db/knex');
 const { parseRoofingCsv } = require('../services/csvParser');
 const { seedInitialData } = require('../services/seeder');
+const {
+  hashPassword,
+  verifyPassword,
+  createToken,
+  requireAuth,
+  requireAdmin
+} = require('../services/auth');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -35,7 +42,7 @@ function applyFilters(query, { date, tosm, subgroup, search }) {
   return query;
 }
 
-// 1. Health check
+// 1. Health check (Public)
 router.get('/health', async (req, res) => {
   try {
     // Quick probe
@@ -56,8 +63,179 @@ router.get('/health', async (req, res) => {
   }
 });
 
+// ==================== AUTHENTICATION ROUTES ====================
+
+// Login (Public)
+router.post('/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required.' });
+    }
+
+    const cleanUsername = String(username).trim().toLowerCase();
+    const user = await db('users').where({ username: cleanUsername }).first();
+
+    if (!user || !user.is_active || !verifyPassword(password, user.password_hash, user.salt)) {
+      return res.status(401).json({ error: 'Invalid username or password.' });
+    }
+
+    const token = createToken(user);
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        full_name: user.full_name || user.username
+      }
+    });
+  } catch (err) {
+    console.error('[LOGIN ERROR]', err);
+    res.status(500).json({ error: 'Authentication failed.' });
+  }
+});
+
+// Get Current User Profile (Requires Auth)
+router.get('/auth/me', requireAuth, async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user || !user.is_active) {
+      return res.status(401).json({ error: 'User account not found or deactivated.' });
+    }
+
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        full_name: user.full_name || user.username
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== USER MANAGEMENT (ADMIN ONLY) ====================
+
+// List all users
+router.get('/users', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const users = await db('users')
+      .select('id', 'username', 'full_name', 'role', 'is_active', 'created_at')
+      .orderBy('id', 'asc');
+    res.json({ users });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create a new user
+router.post('/users', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { username, password, role = 'viewer', full_name } = req.body;
+    if (!username || typeof username !== 'string' || username.trim().length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters.' });
+    }
+    if (!password || typeof password !== 'string' || password.length < 4) {
+      return res.status(400).json({ error: 'Password must be at least 4 characters.' });
+    }
+
+    const cleanUsername = username.trim().toLowerCase();
+    const cleanRole = role === 'admin' ? 'admin' : 'viewer';
+
+    const existing = await db('users').where({ username: cleanUsername }).first();
+    if (existing) {
+      return res.status(400).json({ error: `Username "${cleanUsername}" already exists.` });
+    }
+
+    const { hash, salt } = hashPassword(password);
+    const [userId] = await db('users').insert({
+      username: cleanUsername,
+      password_hash: hash,
+      salt,
+      role: cleanRole,
+      full_name: full_name ? full_name.trim() : null,
+      is_active: true
+    }).returning('id');
+
+    const resolvedId = typeof userId === 'object' ? userId.id : userId;
+    const createdUser = await db('users')
+      .where({ id: resolvedId })
+      .select('id', 'username', 'full_name', 'role', 'is_active', 'created_at')
+      .first();
+
+    res.status(201).json({ success: true, user: createdUser });
+  } catch (err) {
+    console.error('[CREATE USER ERROR]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Assign / Reset Password for a user
+router.put('/users/:id/password', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid user ID.' });
+
+    const { password } = req.body;
+    if (!password || typeof password !== 'string' || password.length < 4) {
+      return res.status(400).json({ error: 'New password must be at least 4 characters.' });
+    }
+
+    const user = await db('users').where({ id }).first();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const { hash, salt } = hashPassword(password);
+    await db('users').where({ id }).update({
+      password_hash: hash,
+      salt,
+      updated_at: db.fn.now()
+    });
+
+    res.json({ success: true, message: `Password for "${user.username}" updated successfully.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a user
+router.delete('/users/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid user ID.' });
+
+    if (id === req.user.id) {
+      return res.status(400).json({ error: 'You cannot delete your own logged-in account.' });
+    }
+
+    const userToDelete = await db('users').where({ id }).first();
+    if (!userToDelete) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    if (userToDelete.role === 'admin') {
+      const adminCountRes = await db('users').where({ role: 'admin' }).count('* as count').first();
+      const adminCount = parseInt(adminCountRes ? (adminCountRes.count || adminCountRes['count(*)']) : 0, 10);
+      if (adminCount <= 1) {
+        return res.status(400).json({ error: 'Cannot delete the only remaining administrator account.' });
+      }
+    }
+
+    await db('users').where({ id }).del();
+    res.json({ success: true, message: `User "${userToDelete.username}" deleted successfully.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== DASHBOARD DATA ROUTES ====================
+
 // 2. Available reporting dates (chronological order)
-router.get('/dates', async (req, res) => {
+router.get('/dates', requireAuth, async (req, res) => {
   try {
     const rows = await db('sales_records')
       .distinct('record_date', 'iso_date')
@@ -75,7 +253,7 @@ router.get('/dates', async (req, res) => {
 });
 
 // 2b. Incremental Monthly Trends (MoM performance across all uploaded periods)
-router.get('/trends', async (req, res) => {
+router.get('/trends', requireAuth, async (req, res) => {
   try {
     const rows = await db('sales_records')
       .select(
@@ -125,7 +303,7 @@ router.get('/trends', async (req, res) => {
 });
 
 // 3. KPI Scorecards & Overview
-router.get('/kpis', async (req, res) => {
+router.get('/kpis', requireAuth, async (req, res) => {
   try {
     const { date, tosm } = req.query;
 
@@ -220,7 +398,7 @@ router.get('/kpis', async (req, res) => {
 });
 
 // 4. Subgroup performance breakdown
-router.get('/subgroups', async (req, res) => {
+router.get('/subgroups', requireAuth, async (req, res) => {
   try {
     const { date, tosm, sortBy = 'sales', order = 'desc' } = req.query;
 
@@ -299,7 +477,7 @@ router.get('/subgroups', async (req, res) => {
 });
 
 // 5. TOSM Breakdown (Channel)
-router.get('/tosm', async (req, res) => {
+router.get('/tosm', requireAuth, async (req, res) => {
   try {
     const { date } = req.query;
     let query = db('sales_records');
@@ -348,7 +526,7 @@ router.get('/tosm', async (req, res) => {
 });
 
 // 6. Raw records with pagination & search
-router.get('/records', async (req, res) => {
+router.get('/records', requireAuth, async (req, res) => {
   try {
     const {
       date,
@@ -401,8 +579,8 @@ router.get('/records', async (req, res) => {
   }
 });
 
-// 7. CSV / TSV Upload endpoint
-router.post('/upload', upload.single('file'), async (req, res) => {
+// 7. CSV / TSV Upload endpoint (Admin Only)
+router.post('/upload', requireAuth, requireAdmin, upload.single('file'), async (req, res) => {
   try {
     let content = '';
     let filename = 'pasted_data.csv';
@@ -465,8 +643,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// Delete a specific batch and its associated records
-router.delete('/batches/:id', async (req, res) => {
+// Delete a specific batch and its associated records (Admin Only)
+router.delete('/batches/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const batchId = parseInt(req.params.id, 10);
     if (isNaN(batchId)) return res.status(400).json({ error: 'Invalid batch ID' });
@@ -483,8 +661,8 @@ router.delete('/batches/:id', async (req, res) => {
   }
 });
 
-// 8. Seed sample data
-router.post('/seed', async (req, res) => {
+// 8. Seed sample data (Admin Only)
+router.post('/seed', requireAuth, requireAdmin, async (req, res) => {
   try {
     const force = Boolean(req.body.force);
     const result = await seedInitialData(force);
@@ -495,7 +673,7 @@ router.post('/seed', async (req, res) => {
 });
 
 // 9. Export filtered data to CSV
-router.get('/export', async (req, res) => {
+router.get('/export', requireAuth, async (req, res) => {
   try {
     const { date, tosm, subgroup, search } = req.query;
     let query = db('sales_records');
@@ -546,7 +724,7 @@ router.get('/export', async (req, res) => {
 });
 
 // 10. Batches history
-router.get('/batches', async (req, res) => {
+router.get('/batches', requireAuth, async (req, res) => {
   try {
     const batches = await db('upload_batches').orderBy('id', 'desc').limit(20);
     res.json({ batches });
@@ -556,7 +734,7 @@ router.get('/batches', async (req, res) => {
 });
 
 // 11. Monthly Report: Actual vs Budget vs Prior Year with MoM Variance
-router.get('/monthly-report', async (req, res) => {
+router.get('/monthly-report', requireAuth, async (req, res) => {
   try {
     const year = parseInt(req.query.year, 10) || 2026;
 
@@ -749,7 +927,7 @@ router.get('/monthly-report', async (req, res) => {
 });
 
 // 12. Update / Input Budget, Actual Sales and Last Year Figures for a Specific Month
-router.put('/monthly-budgets/:month', async (req, res) => {
+router.put('/monthly-budgets/:month', requireAuth, requireAdmin, async (req, res) => {
   try {
     const month = parseInt(req.params.month, 10);
     if (isNaN(month) || month < 1 || month > 12) {

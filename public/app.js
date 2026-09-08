@@ -3,8 +3,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Theme State (Default is 'light' / White View)
   let currentTheme = localStorage.getItem('roofing_theme') || 'light';
 
-  // Dashboard Data State
+  // Dashboard Data State & Auth
   const state = {
+    token: localStorage.getItem('roofing_token') || null,
+    user: JSON.parse(localStorage.getItem('roofing_user') || 'null'),
     activeTab: 'overview', // 'overview' | 'monthly'
     date: '31/08/2026',
     tosm: 'all',
@@ -174,7 +176,47 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCloseBatches: document.getElementById('btnCloseBatches'),
     btnDismissBatches: document.getElementById('btnDismissBatches'),
     batchesDbDialect: document.getElementById('batchesDbDialect'),
-    batchesTableBody: document.getElementById('batchesTableBody')
+    batchesTableBody: document.getElementById('batchesTableBody'),
+
+    // Auth & Navigation User Controls
+    btnManageUsers: document.getElementById('btnManageUsers'),
+    userProfileChip: document.getElementById('userProfileChip'),
+    navUsername: document.getElementById('navUsername'),
+    navUserRoleBadge: document.getElementById('navUserRoleBadge'),
+    btnLogout: document.getElementById('btnLogout'),
+
+    // Login Modal
+    loginModal: document.getElementById('loginModal'),
+    formLogin: document.getElementById('formLogin'),
+    loginUsername: document.getElementById('loginUsername'),
+    loginPassword: document.getElementById('loginPassword'),
+    loginAlert: document.getElementById('loginAlert'),
+    btnLoginSubmit: document.getElementById('btnLoginSubmit'),
+
+    // User Management Modal
+    userManagementModal: document.getElementById('userManagementModal'),
+    btnCloseUserManagement: document.getElementById('btnCloseUserManagement'),
+    btnDismissUserManagement: document.getElementById('btnDismissUserManagement'),
+    formAddUser: document.getElementById('formAddUser'),
+    newUserUsername: document.getElementById('newUserUsername'),
+    newUserFullName: document.getElementById('newUserFullName'),
+    newUserPassword: document.getElementById('newUserPassword'),
+    newUserRole: document.getElementById('newUserRole'),
+    addUserAlert: document.getElementById('addUserAlert'),
+    btnCreateUser: document.getElementById('btnCreateUser'),
+    userCountBadge: document.getElementById('userCountBadge'),
+    usersTableBody: document.getElementById('usersTableBody'),
+
+    // Reset Password Modal
+    resetPasswordModal: document.getElementById('resetPasswordModal'),
+    btnCloseResetPassword: document.getElementById('btnCloseResetPassword'),
+    btnCancelResetPassword: document.getElementById('btnCancelResetPassword'),
+    formResetPassword: document.getElementById('formResetPassword'),
+    resetPasswordUserId: document.getElementById('resetPasswordUserId'),
+    resetPasswordInput: document.getElementById('resetPasswordInput'),
+    resetPasswordAlert: document.getElementById('resetPasswordAlert'),
+    btnSaveNewPassword: document.getElementById('btnSaveNewPassword'),
+    resetPasswordTitle: document.getElementById('resetPasswordTitle')
   };
 
   // --- Theme Management (Light by default) ---
@@ -219,6 +261,71 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  // --- Authentication & Role-Based Access Control ---
+  async function apiFetch(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (state.token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${state.token}`);
+    }
+    const updatedOptions = { ...options, headers };
+    const res = await fetch(url, updatedOptions);
+
+    if (res.status === 401) {
+      handleUnauthorized('Session expired or authentication required. Please sign in.');
+      throw new Error('Unauthorized');
+    }
+    return res;
+  }
+
+  function handleUnauthorized(msg = '') {
+    state.token = null;
+    state.user = null;
+    localStorage.removeItem('roofing_token');
+    localStorage.removeItem('roofing_user');
+    applyUserPermissions(null);
+    if (msg) showLoginAlert(msg, 'error');
+  }
+
+  function showLoginAlert(msg, type = 'error') {
+    if (!el.loginAlert) return;
+    el.loginAlert.textContent = msg;
+    el.loginAlert.classList.remove('hidden');
+    if (type === 'error') {
+      el.loginAlert.className = 'p-3 rounded-lg text-xs bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800';
+    } else {
+      el.loginAlert.className = 'p-3 rounded-lg text-xs bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+    }
+  }
+
+  function applyUserPermissions(user) {
+    if (!user) {
+      if (el.loginModal) el.loginModal.classList.remove('hidden');
+      if (el.userProfileChip) el.userProfileChip.classList.add('hidden');
+      return;
+    }
+
+    if (el.loginModal) el.loginModal.classList.add('hidden');
+    if (el.userProfileChip) el.userProfileChip.classList.remove('hidden');
+    if (el.navUsername) el.navUsername.textContent = user.full_name || user.username;
+
+    const isAdmin = user.role === 'admin';
+    if (el.navUserRoleBadge) {
+      el.navUserRoleBadge.textContent = isAdmin ? 'Admin' : 'View Only';
+      el.navUserRoleBadge.className = isAdmin
+        ? 'text-[10px] font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider'
+        : 'text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider';
+    }
+
+    // Toggle admin-only elements across the whole UI
+    document.querySelectorAll('.admin-only').forEach(elem => {
+      if (isAdmin) {
+        elem.classList.remove('hidden');
+      } else {
+        elem.classList.add('hidden');
+      }
+    });
+  }
+
   // --- Screen Navigation Tabs ---
   function switchTab(tab) {
     state.activeTab = tab;
@@ -260,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 2. Fetch Dates
   async function loadDates() {
     try {
-      const res = await fetch('/api/dates');
+      const res = await apiFetch('/api/dates');
       const data = await res.json();
       if (data.dates && data.dates.length > 0) {
         const currentSelected = el.filterDate.value;
@@ -290,7 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.date) params.append('date', state.date);
       if (state.tosm && state.tosm !== 'all') params.append('tosm', state.tosm);
 
-      const res = await fetch(`/api/kpis?${params.toString()}`);
+      const res = await apiFetch(`/api/kpis?${params.toString()}`);
       const data = await res.json();
       state.kpisData = data;
 
@@ -335,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
       params.append('sortBy', state.sortBy);
       params.append('order', state.sortOrder);
 
-      const res = await fetch(`/api/subgroups?${params.toString()}`);
+      const res = await apiFetch(`/api/subgroups?${params.toString()}`);
       const data = await res.json();
       state.subgroupsData = data.subgroups || [];
 
@@ -445,7 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==================== 5. MONTHLY BUDGET & PRIOR YEAR REPORT LOGIC ====================
   async function loadMonthlyReport() {
     try {
-      const res = await fetch('/api/monthly-report?year=2026');
+      const res = await apiFetch('/api/monthly-report?year=2026');
       const data = await res.json();
       state.monthlyReportData = data;
 
@@ -672,9 +779,10 @@ document.addEventListener('DOMContentLoaded', () => {
           </td>
           <td class="py-2.5 px-4 text-center">${statusBadge}</td>
           <td class="py-2.5 px-4 text-center">
+            ${state.user && state.user.role === 'admin' ? `
             <button class="btnEditRowBudget px-2 py-0.5 rounded text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950 font-medium text-[11px] border border-sky-200 dark:border-sky-900" data-month="${m.month}">
               <i class="fa-solid fa-pen mr-1"></i>Edit
-            </button>
+            </button>` : `<span class="text-slate-400 text-[11px] font-mono">—</span>`}
           </td>
         </tr>
       `;
@@ -788,7 +896,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const notes = el.inputBudgetNotes.value.trim();
 
     try {
-      const res = await fetch(`/api/monthly-budgets/${month}`, {
+      const res = await apiFetch(`/api/monthly-budgets/${month}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1074,6 +1182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.date) params.append('date', state.date);
     if (state.tosm && state.tosm !== 'all') params.append('tosm', state.tosm);
     if (state.search) params.append('search', state.search);
+    if (state.token) params.append('token', state.token);
     window.location.href = `/api/export?${params.toString()}`;
   });
 
@@ -1160,7 +1269,7 @@ document.addEventListener('DOMContentLoaded', () => {
       el.btnSubmitUpload.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Ingesting...';
 
       try {
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const res = await apiFetch('/api/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Upload failed');
 
@@ -1187,7 +1296,7 @@ document.addEventListener('DOMContentLoaded', () => {
       el.btnSubmitUpload.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Ingesting...';
 
       try {
-        const res = await fetch('/api/upload', {
+        const res = await apiFetch('/api/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1234,7 +1343,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     try {
-      const res = await fetch('/api/seed', {
+      const res = await apiFetch('/api/seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ force: true })
@@ -1245,6 +1354,8 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadDates();
         await reloadAll();
         setTimeout(closeUploadModal, 1200);
+      } else {
+        showUploadStatus(data.error || 'Failed to reset seed data', 'error');
       }
     } catch (e) {
       showUploadStatus(e.message, 'error');
@@ -1258,13 +1369,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const healthData = await healthRes.json();
       el.batchesDbDialect.textContent = healthData.database || 'SQLite';
 
-      const batchesRes = await fetch('/api/batches');
+      const batchesRes = await apiFetch('/api/batches');
       const batchesData = await batchesRes.json();
       const batches = batchesData.batches || [];
 
       if (batches.length === 0) {
         el.batchesTableBody.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-400">No batches found</td></tr>';
       } else {
+        const isAdmin = state.user && state.user.role === 'admin';
         el.batchesTableBody.innerHTML = batches.map(b => `
           <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
             <td class="p-2.5 font-mono text-sky-600 dark:text-sky-400 font-bold">#${b.id}</td>
@@ -1274,33 +1386,36 @@ document.addEventListener('DOMContentLoaded', () => {
             <td class="p-2.5 font-semibold text-slate-700 dark:text-slate-300">${b.reporting_date || '-'}</td>
             <td class="p-2.5 text-slate-500 dark:text-slate-400 text-[11px]">${new Date(b.uploaded_at).toLocaleDateString()}</td>
             <td class="p-2.5 text-center">
+              ${isAdmin ? `
               <button data-batch-id="${b.id}" class="btnDeleteBatch px-2 py-0.5 rounded text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950 font-medium text-[11px] border border-rose-200 dark:border-rose-900 transition-colors">
                 <i class="fa-solid fa-trash-can mr-1"></i>Delete
-              </button>
+              </button>` : `<span class="text-slate-400 text-[11px] font-mono">—</span>`}
             </td>
           </tr>
         `).join('');
 
-        document.querySelectorAll('.btnDeleteBatch').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            const batchId = e.currentTarget.getAttribute('data-batch-id');
-            if (!confirm(`Delete Batch #${batchId} and all associated records?`)) return;
+        if (isAdmin) {
+          document.querySelectorAll('.btnDeleteBatch').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              const batchId = e.currentTarget.getAttribute('data-batch-id');
+              if (!confirm(`Delete Batch #${batchId} and all associated records?`)) return;
 
-            try {
-              const delRes = await fetch(`/api/batches/${batchId}`, { method: 'DELETE' });
-              const delJson = await delRes.json();
-              if (delJson.success) {
-                await refreshBatchesList();
-                await loadDates();
-                await reloadAll();
-              } else {
-                alert(delJson.error || 'Failed to delete batch');
+              try {
+                const delRes = await apiFetch(`/api/batches/${batchId}`, { method: 'DELETE' });
+                const delJson = await delRes.json();
+                if (delJson.success) {
+                  await refreshBatchesList();
+                  await loadDates();
+                  await reloadAll();
+                } else {
+                  alert(delJson.error || 'Failed to delete batch');
+                }
+              } catch (err) {
+                alert('Error deleting batch: ' + err.message);
               }
-            } catch (err) {
-              alert('Error deleting batch: ' + err.message);
-            }
+            });
           });
-        });
+        }
       }
     } catch (e) {
       console.error(e);
@@ -1315,9 +1430,261 @@ document.addEventListener('DOMContentLoaded', () => {
   el.btnCloseBatches.addEventListener('click', () => el.batchesModal.classList.add('hidden'));
   el.btnDismissBatches.addEventListener('click', () => el.batchesModal.classList.add('hidden'));
 
-  // Init Boot
-  loadHealth();
-  loadDates().then(() => {
-    reloadAll();
-  });
+  // ==================== USER MANAGEMENT (ADMIN ONLY) ====================
+  async function loadUsers() {
+    try {
+      const res = await apiFetch('/api/users');
+      const data = await res.json();
+      const users = data.users || [];
+
+      if (el.userCountBadge) {
+        el.userCountBadge.textContent = `${users.length} ${users.length === 1 ? 'user' : 'users'}`;
+      }
+
+      if (users.length === 0) {
+        el.usersTableBody.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-400">No users found</td></tr>';
+        return;
+      }
+
+      el.usersTableBody.innerHTML = users.map(u => {
+        const isCurrent = state.user && state.user.id === u.id;
+        const isAdminRole = u.role === 'admin';
+        const roleBadge = isAdminRole
+          ? '<span class="px-2 py-0.5 rounded font-bold text-[10px] bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800">Admin</span>'
+          : '<span class="px-2 py-0.5 rounded font-medium text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">Viewer</span>';
+
+        const createdDate = u.created_at ? new Date(u.created_at).toLocaleDateString() : '—';
+
+        return `
+          <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+            <td class="p-2.5 font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+              <span>${u.username}</span>
+              ${isCurrent ? '<span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-semibold">(You)</span>' : ''}
+            </td>
+            <td class="p-2.5 text-slate-600 dark:text-slate-300">${u.full_name || '—'}</td>
+            <td class="p-2.5 text-center">${roleBadge}</td>
+            <td class="p-2.5 text-slate-500 dark:text-slate-400 text-[11px]">${createdDate}</td>
+            <td class="p-2.5 text-center space-x-1">
+              <button class="btnOpenResetPass px-2 py-0.5 rounded text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 font-medium text-[11px] border border-amber-200 dark:border-amber-900 transition-colors" data-id="${u.id}" data-username="${u.username}">
+                <i class="fa-solid fa-key mr-1"></i>Password
+              </button>
+              ${!isCurrent ? `
+              <button class="btnDeleteUserRow px-2 py-0.5 rounded text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950 font-medium text-[11px] border border-rose-200 dark:border-rose-900 transition-colors" data-id="${u.id}" data-username="${u.username}">
+                <i class="fa-solid fa-trash-can mr-1"></i>Delete
+              </button>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Wire up reset password buttons
+      document.querySelectorAll('.btnOpenResetPass').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = e.currentTarget.getAttribute('data-id');
+          const username = e.currentTarget.getAttribute('data-username');
+          openResetPasswordModal(id, username);
+        });
+      });
+
+      // Wire up delete user buttons
+      document.querySelectorAll('.btnDeleteUserRow').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.currentTarget.getAttribute('data-id');
+          const username = e.currentTarget.getAttribute('data-username');
+          if (!confirm(`Are you sure you want to delete user account "${username}"?`)) return;
+
+          try {
+            const delRes = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
+            const delData = await delRes.json();
+            if (!delRes.ok) throw new Error(delData.error || 'Failed to delete user');
+            await loadUsers();
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+      });
+    } catch (err) {
+      console.error('Error loading users:', err);
+    }
+  }
+
+  function openUserManagementModal() {
+    if (el.addUserAlert) el.addUserAlert.className = 'hidden';
+    if (el.formAddUser) el.formAddUser.reset();
+    loadUsers();
+    el.userManagementModal.classList.remove('hidden');
+  }
+
+  if (el.btnManageUsers) {
+    el.btnManageUsers.addEventListener('click', openUserManagementModal);
+  }
+  if (el.btnCloseUserManagement) {
+    el.btnCloseUserManagement.addEventListener('click', () => el.userManagementModal.classList.add('hidden'));
+  }
+  if (el.btnDismissUserManagement) {
+    el.btnDismissUserManagement.addEventListener('click', () => el.userManagementModal.classList.add('hidden'));
+  }
+
+  // Create User Form
+  if (el.formAddUser) {
+    el.formAddUser.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      el.addUserAlert.className = 'hidden';
+
+      const username = el.newUserUsername.value.trim();
+      const full_name = el.newUserFullName.value.trim();
+      const password = el.newUserPassword.value;
+      const role = el.newUserRole.value;
+
+      el.btnCreateUser.disabled = true;
+      el.btnCreateUser.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
+
+      try {
+        const res = await apiFetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, full_name, password, role })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to create user');
+
+        el.addUserAlert.textContent = `User "${data.user.username}" created successfully with ${data.user.role === 'admin' ? 'Administrator' : 'View Only'} access!`;
+        el.addUserAlert.className = 'p-2.5 rounded-lg text-xs bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+
+        el.formAddUser.reset();
+        await loadUsers();
+      } catch (err) {
+        el.addUserAlert.textContent = err.message;
+        el.addUserAlert.className = 'p-2.5 rounded-lg text-xs bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800';
+      } finally {
+        el.btnCreateUser.disabled = false;
+        el.btnCreateUser.innerHTML = '<i class="fa-solid fa-plus"></i> Create User';
+      }
+    });
+  }
+
+  // Reset / Assign Password Modal
+  function openResetPasswordModal(userId, username) {
+    if (el.resetPasswordAlert) el.resetPasswordAlert.className = 'hidden';
+    el.resetPasswordUserId.value = userId;
+    el.resetPasswordTitle.textContent = `Assign Password for "${username}"`;
+    el.resetPasswordInput.value = '';
+    el.resetPasswordModal.classList.remove('hidden');
+    el.resetPasswordInput.focus();
+  }
+
+  if (el.btnCloseResetPassword) {
+    el.btnCloseResetPassword.addEventListener('click', () => el.resetPasswordModal.classList.add('hidden'));
+  }
+  if (el.btnCancelResetPassword) {
+    el.btnCancelResetPassword.addEventListener('click', () => el.resetPasswordModal.classList.add('hidden'));
+  }
+
+  if (el.formResetPassword) {
+    el.formResetPassword.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userId = el.resetPasswordUserId.value;
+      const newPassword = el.resetPasswordInput.value;
+
+      el.btnSaveNewPassword.disabled = true;
+      el.btnSaveNewPassword.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+      try {
+        const res = await apiFetch(`/api/users/${userId}/password`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: newPassword })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to update password');
+
+        el.resetPasswordAlert.textContent = data.message || 'Password updated successfully!';
+        el.resetPasswordAlert.className = 'p-2.5 rounded-lg text-xs bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+
+        setTimeout(() => {
+          el.resetPasswordModal.classList.add('hidden');
+        }, 1200);
+      } catch (err) {
+        el.resetPasswordAlert.textContent = err.message;
+        el.resetPasswordAlert.className = 'p-2.5 rounded-lg text-xs bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800';
+      } finally {
+        el.btnSaveNewPassword.disabled = false;
+        el.btnSaveNewPassword.innerHTML = 'Save Password';
+      }
+    });
+  }
+
+  // ==================== LOGIN & LOGOUT HANDLERS ====================
+  if (el.formLogin) {
+    el.formLogin.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      el.loginAlert.classList.add('hidden');
+      const username = el.loginUsername.value.trim();
+      const password = el.loginPassword.value;
+
+      el.btnLoginSubmit.disabled = true;
+      el.btnLoginSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Invalid credentials.');
+        }
+
+        state.token = data.token;
+        state.user = data.user;
+        localStorage.setItem('roofing_token', data.token);
+        localStorage.setItem('roofing_user', JSON.stringify(data.user));
+
+        applyUserPermissions(data.user);
+        await loadDates();
+        await reloadAll();
+      } catch (err) {
+        showLoginAlert(err.message, 'error');
+      } finally {
+        el.btnLoginSubmit.disabled = false;
+        el.btnLoginSubmit.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
+      }
+    });
+  }
+
+  if (el.btnLogout) {
+    el.btnLogout.addEventListener('click', () => {
+      handleUnauthorized('You have signed out successfully.');
+    });
+  }
+
+  // ==================== BOOT APPLICATION ====================
+  async function initApp() {
+    loadHealth();
+
+    if (!state.token) {
+      applyUserPermissions(null);
+      return;
+    }
+
+    try {
+      const res = await apiFetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        state.user = data.user;
+        localStorage.setItem('roofing_user', JSON.stringify(data.user));
+        applyUserPermissions(state.user);
+        await loadDates();
+        await reloadAll();
+      } else {
+        handleUnauthorized();
+      }
+    } catch (e) {
+      console.warn('Authentication check failed:', e);
+      handleUnauthorized();
+    }
+  }
+
+  initApp();
 });
