@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roofing Department | Executive Reporting Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+              900: '#082f49'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-full font-sans antialiased transition-colors duration-200">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-white/95 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 backdrop-blur-md shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-lg bg-sky-50 dark:bg-sky-500/20 border border-sky-200 dark:border-sky-500/40 flex items-center justify-center text-sky-600 dark:text-sky-400 text-xl shadow-xs">
+            <i class="fa-solid fa-house-chimney-window"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h1 class="text-lg font-bold text-slate-900 dark:text-white tracking-wide">ROOFING DEPARTMENT</h1>
+              <span id="dbBadge" class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-mono font-semibold flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>
+                <span id="dbName">SQLite</span>
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Monthly Incremental Sales, Margin & Budget Performance</p>
+          </div>
+        </div>
+
+        <!-- Global Action Controls -->
+        <div class="flex items-center space-x-2.5">
+          <!-- Light / Dark Theme Toggle Button -->
+          <button id="btnThemeToggle" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors border border-slate-200 dark:border-slate-700" title="Toggle Light / Dark View">
+            <i id="themeIcon" class="fa-solid fa-moon"></i>
+          </button>
+
+          <!-- Refresh Button -->
+          <button id="btnRefresh" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors border border-slate-200 dark:border-slate-700" title="Refresh Dashboard">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+
+          <!-- Export CSV -->
+          <button id="btnExport" class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors border border-slate-200 dark:border-slate-700">
+            <i class="fa-solid fa-file-export text-sky-600 dark:text-sky-400"></i>
+            Export CSV
+          </button>
+
+          <!-- Upload CSV Modal Trigger -->
+          <button id="btnOpenUpload" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-xs shadow-sky-600/30 transition-all">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            Upload Monthly / New CSV
+          </button>
+
+          <!-- Batches History / Reset -->
+          <button id="btnOpenBatches" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors border border-slate-200 dark:border-slate-700" title="Upload History & Batches">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Screen Navigation Tabs Bar -->
+  <nav class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center space-x-2">
+      <button id="tabNavOverview" class="py-3 px-4 text-xs font-bold border-b-2 border-sky-600 text-sky-600 dark:text-sky-400 dark:border-sky-400 flex items-center gap-2 transition-all">
+        <i class="fa-solid fa-table-cells-large"></i>
+        Department Matrix & Categories
+      </button>
+      <button id="tabNavMonthly" class="py-3 px-4 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 border-b-2 border-transparent flex items-center gap-2 transition-all">
+        <i class="fa-solid fa-calendar-check"></i>
+        Monthly Budget vs Actual vs Prior Year
+      </button>
+    </div>
+  </nav>
+
+  <!-- ==================== VIEW 1: OVERVIEW & CATEGORY MATRIX ==================== -->
+  <div id="viewOverview">
+    <!-- Filter & Control Toolbar -->
+    <section class="bg-slate-100/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 py-3.5">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          
+          <!-- Left Filters: Period & Channel -->
+          <div class="flex flex-wrap items-center gap-3">
+            <!-- Period Selector -->
+            <div class="flex items-center gap-2">
+              <label for="filterDate" class="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Period:</label>
+              <select id="filterDate" class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-xs">
+                <option value="all">All Uploaded Periods (Cumulative)</option>
+                <option value="31/08/2026" selected>August 2026 (31/08/2026)</option>
+              </select>
+            </div>
+
+            <!-- Channel Filter: TOSM -->
+            <div class="flex items-center gap-2">
+              <label for="filterTosm" class="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Channel:</label>
+              <select id="filterTosm" class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-xs">
+                <option value="all">All Channels (Credit & Cash)</option>
+                <option value="0">Credit Stock Sales (TOSM 0)</option>
+                <option value="1">Cash Stock Sales (TOSM 1)</option>
+              </select>
+            </div>
+
+            <!-- SubGroup Quick Search -->
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-xs"></i>
+              <input type="text" id="filterSearch" placeholder="Search category / code..." class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md pl-7 pr-3 py-1.5 text-xs text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 w-44 sm:w-56 shadow-xs">
+            </div>
+          </div>
+
+          <!-- Right Indicators: Quick Summary Pill -->
+          <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+              Lines Ingested: <strong id="kpiRecordCount" class="text-slate-800 dark:text-white">20</strong>
+            </span>
+            <span class="text-slate-300 dark:text-slate-600">|</span>
+            <span class="inline-flex items-center gap-1.5">
+              Credit Share: <strong id="kpiCreditShare" class="text-sky-600 dark:text-sky-300 font-semibold">93.6%</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+      <!-- KPI Scorecards Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Card 1: Total Sales Revenue -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs relative overflow-hidden group hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Period Revenue</span>
+            <div class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center text-sm">
+              <i class="fa-solid fa-sterling-sign"></i>
+            </div>
+          </div>
+          <div class="text-2xl font-black text-slate-900 dark:text-white tracking-tight" id="cardSales">£203,496.89</div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span>YTD Cumulative:</span>
+            <span id="cardYtdSales" class="font-semibold text-slate-800 dark:text-slate-200">£1,718,772.69</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Gross Margin (£) -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs relative overflow-hidden group hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Gross Margin</span>
+            <div class="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm">
+              <i class="fa-solid fa-chart-line"></i>
+            </div>
+          </div>
+          <div class="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight" id="cardMargin">£54,391.66</div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span>Period Cost (COGS):</span>
+            <span id="cardCost" class="font-semibold text-slate-800 dark:text-slate-200">£149,105.23</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Margin Percentage (%) -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs relative overflow-hidden group hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Gross Margin %</span>
+            <div class="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center text-sm">
+              <i class="fa-solid fa-percent"></i>
+            </div>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <div class="text-2xl font-black text-amber-600 dark:text-amber-400 tracking-tight" id="cardMarginPct">26.73%</div>
+            <span class="text-xs text-slate-500 dark:text-slate-400">weighted avg</span>
+          </div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span>YTD Margin %:</span>
+            <span id="cardYtdMarginPct" class="font-semibold text-amber-600 dark:text-amber-300">24.50%</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Transactions & Return Rate -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs relative overflow-hidden group hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Invoices & Returns</span>
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm">
+              <i class="fa-solid fa-receipt"></i>
+            </div>
+          </div>
+          <div class="flex items-baseline justify-between">
+            <div class="text-2xl font-black text-slate-900 dark:text-white tracking-tight" id="cardInvoices">2,499</div>
+            <span class="text-xs px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 font-semibold" id="cardCredits">82 Credits</span>
+          </div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span>Credit Return Rate:</span>
+            <span id="cardCreditRate" class="font-semibold text-rose-600 dark:text-rose-300">3.18%</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Secondary Metric Bar: Quantity & Channel Breakdown -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        <!-- Total Volume / Quantity -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-xs">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400 border border-sky-100 dark:border-sky-800/60 flex items-center justify-center">
+              <i class="fa-solid fa-cubes-stacked"></i>
+            </div>
+            <div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">Invoiced Units Sold (Qty)</div>
+              <div class="text-lg font-bold text-slate-900 dark:text-white" id="barQuantity">44,356.62</div>
+            </div>
+          </div>
+          <div class="text-right text-xs text-slate-500 dark:text-slate-400">
+            <div>YTD Volume:</div>
+            <div class="font-semibold text-slate-700 dark:text-slate-200" id="barYtdQuantity">419,627.55</div>
+          </div>
+        </div>
+
+        <!-- Credit Stock Sales Share -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-xs">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/60 flex items-center justify-center">
+              <i class="fa-solid fa-building-columns"></i>
+            </div>
+            <div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">Credit Account Sales</div>
+              <div class="text-lg font-bold text-blue-600 dark:text-blue-400" id="barCreditSales">£190,425.97</div>
+            </div>
+          </div>
+          <div class="text-right text-xs text-slate-500 dark:text-slate-400">
+            <div>Share of Total:</div>
+            <div class="font-semibold text-blue-600 dark:text-blue-300" id="barCreditPct">93.6%</div>
+          </div>
+        </div>
+
+        <!-- Cash Stock Sales Share -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-xs">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-teal-50 dark:bg-teal-950 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-800/60 flex items-center justify-center">
+              <i class="fa-solid fa-cash-register"></i>
+            </div>
+            <div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">Cash / Counter Sales</div>
+              <div class="text-lg font-bold text-teal-600 dark:text-teal-400" id="barCashSales">£13,070.92</div>
+            </div>
+          </div>
+          <div class="text-right text-xs text-slate-500 dark:text-slate-400">
+            <div>Share of Total:</div>
+            <div class="font-semibold text-teal-600 dark:text-teal-300" id="barCashPct">6.4%</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Charts Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Chart 1: Revenue & Margin by Subgroup (Spans 2 cols) -->
+        <div class="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-chart-column text-sky-600 dark:text-sky-400"></i>
+                Sales Revenue & Gross Margin by Roofing Category
+              </h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Comparison of total revenue vs gross margin across roofing sub-groups</p>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium" id="chartPeriodLabel">August 2026</span>
+          </div>
+          <div class="relative h-80">
+            <canvas id="chartRevenueMargin"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: Channel Split Donut -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <i class="fa-solid fa-chart-pie text-sky-600 dark:text-sky-400"></i>
+                  Channel Split (Cash vs Credit)
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Distribution of period revenue by sales channel</p>
+              </div>
+            </div>
+            <div class="relative h-56 flex items-center justify-center">
+              <canvas id="chartChannelSplit"></canvas>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-center text-xs">
+            <div class="bg-slate-50 dark:bg-slate-950 p-2 rounded-lg border border-slate-200 dark:border-slate-800">
+              <div class="text-slate-500 dark:text-slate-400 text-[10px] uppercase font-bold">Credit Sales</div>
+              <div class="font-bold text-sky-600 dark:text-sky-400 mt-0.5" id="miniCreditSales">£190.4k</div>
+              <div class="text-[10px] text-slate-400">17 Categories</div>
+            </div>
+            <div class="bg-slate-50 dark:bg-slate-950 p-2 rounded-lg border border-slate-200 dark:border-slate-800">
+              <div class="text-slate-500 dark:text-slate-400 text-[10px] uppercase font-bold">Cash Sales</div>
+              <div class="font-bold text-teal-600 dark:text-teal-400 mt-0.5" id="miniCashSales">£13.1k</div>
+              <div class="text-[10px] text-slate-400">3 Categories</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart 3: Profitability Margin % Ranking (Horizontal Bar) -->
+        <div class="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-award text-amber-600 dark:text-amber-400"></i>
+                Profitability Spectrum (% Gross Margin by Category)
+              </h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">High-margin drivers (Battens, Chimneys, Ventilation) vs High-volume drivers (Slates, Windows)</p>
+            </div>
+          </div>
+          <div class="relative h-72">
+            <canvas id="chartMarginRank"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 4: Credit Note Risk / Return Analysis -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-rose-600 dark:text-rose-400"></i>
+                Return Rate Analysis
+              </h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Credit notes as % of total transactions per category</p>
+            </div>
+          </div>
+          <div class="relative h-72">
+            <canvas id="chartReturnRisk"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SubGroup Performance Data Table -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden">
+        
+        <!-- Table Header Bar -->
+        <div class="p-4 sm:px-6 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <i class="fa-solid fa-table-list text-sky-600 dark:text-sky-400"></i>
+              Roofing Department SubGroup Performance Matrix
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Granular breakdown of period revenue, margins, volumes, and YTD performance</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500 dark:text-slate-400">Sort By:</span>
+            <select id="tableSortBy" class="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 cursor-pointer shadow-xs">
+              <option value="sales">Sales (Highest First)</option>
+              <option value="margin">Margin £ (Highest First)</option>
+              <option value="margin_pct">Margin % (Highest First)</option>
+              <option value="invoices">Invoice Volume</option>
+              <option value="credits">Credit Notes</option>
+              <option value="subgroup">SubGroup Code</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Table Container -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+            <thead class="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-200 dark:border-slate-800">
+              <tr>
+                <th scope="col" class="py-3 px-4">Code</th>
+                <th scope="col" class="py-3 px-4">Category Description</th>
+                <th scope="col" class="py-3 px-4 text-right">Sales (£)</th>
+                <th scope="col" class="py-3 px-4 text-right">Cost (£)</th>
+                <th scope="col" class="py-3 px-4 text-right">Margin (£)</th>
+                <th scope="col" class="py-3 px-4 text-center">Margin %</th>
+                <th scope="col" class="py-3 px-4 text-right">Quantity</th>
+                <th scope="col" class="py-3 px-4 text-center">Inv / Cr</th>
+                <th scope="col" class="py-3 px-4 text-right">Return %</th>
+                <th scope="col" class="py-3 px-4 text-right">YTD Sales (£)</th>
+                <th scope="col" class="py-3 px-4 text-center">YTD Margin %</th>
+              </tr>
+            </thead>
+            <tbody id="subgroupsTableBody" class="divide-y divide-slate-100 dark:divide-slate-800">
+              <!-- Populated via JavaScript -->
+              <tr>
+                <td colspan="11" class="text-center py-8 text-slate-400 dark:text-slate-500">
+                  <i class="fa-solid fa-spinner fa-spin text-lg mb-2"></i>
+                  <p>Loading roofing performance records...</p>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot id="subgroupsTableFoot" class="bg-slate-50 dark:bg-slate-950/90 text-slate-900 dark:text-white font-bold text-xs border-t-2 border-slate-300 dark:border-slate-700">
+              <!-- Populated via JavaScript -->
+            </tfoot>
+          </table>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ==================== VIEW 2: MONTHLY REPORT & BUDGET VARIANCE ==================== -->
+  <div id="viewMonthly" class="hidden">
+    <!-- Monthly Toolbar -->
+    <section class="bg-slate-100/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 py-3.5">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2">
+            <label for="monthlyFilterMonth" class="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Focus Month:</label>
+            <select id="monthlyFilterMonth" class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-xs">
+              <option value="all">Full Year (Jan - Dec 2026)</option>
+              <option value="1">January 2026</option>
+              <option value="2">February 2026</option>
+              <option value="3">March 2026</option>
+              <option value="4">April 2026</option>
+              <option value="5">May 2026</option>
+              <option value="6">June 2026</option>
+              <option value="7">July 2026</option>
+              <option value="8" selected>August 2026 (Actual Month)</option>
+              <option value="9">September 2026</option>
+              <option value="10">October 2026</option>
+              <option value="11">November 2026</option>
+              <option value="12">December 2026</option>
+            </select>
+          </div>
+          <span class="text-xs px-2.5 py-1 rounded bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-semibold" id="monthlyStatusBadge">
+            August 2026: Actuals Available
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <button id="btnOpenEditBudget" class="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold flex items-center gap-2 shadow-xs transition-colors">
+            <i class="fa-solid fa-pen-to-square"></i>
+            Input / Edit Monthly Figures
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+      <!-- Monthly Scorecards: Actual vs Budget vs Prior Year -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Scorecard 1: Actual vs Budget (Sales) -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs relative">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider" id="lblMonthActual">August Actual Sales</span>
+            <div class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center text-sm">
+              <i class="fa-solid fa-bullseye"></i>
+            </div>
+          </div>
+          <div class="text-2xl font-black text-slate-900 dark:text-white tracking-tight" id="mbActualSales">£203,496.89</div>
+          <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+            <span class="text-slate-500 dark:text-slate-400">Budget: <strong id="mbBudgetSales" class="text-slate-700 dark:text-slate-200">£195,000.00</strong></span>
+            <span id="mbVarBudgetBadge" class="px-2 py-0.5 rounded font-bold text-[11px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+              +£8,496.89 (+4.36%) ▲
+            </span>
+          </div>
+        </div>
+
+        <!-- Scorecard 2: Actual vs Last Year (Same Month) -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs relative">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">vs Last Year (Aug 2025)</span>
+            <div class="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center text-sm">
+              <i class="fa-solid fa-arrow-trend-up"></i>
+            </div>
+          </div>
+          <div class="text-2xl font-black text-slate-900 dark:text-white tracking-tight" id="mbVarPriorSales">+£18,296.89</div>
+          <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+            <span class="text-slate-500 dark:text-slate-400">Last Year: <strong id="mbPriorSales" class="text-slate-700 dark:text-slate-200">£185,200.00</strong></span>
+            <span id="mbVarPriorBadge" class="px-2 py-0.5 rounded font-bold text-[11px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+              +9.88% ▲
+            </span>
+          </div>
+        </div>
+
+        <!-- Scorecard 3: Margin Actual vs Budget -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs relative">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Gross Margin Actual vs Budget</span>
+            <div class="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm">
+              <i class="fa-solid fa-percent"></i>
+            </div>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <div class="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight" id="mbActualMarginPct">26.73%</div>
+            <span class="text-xs text-slate-500 dark:text-slate-400">Budget: 26.00%</span>
+          </div>
+          <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span>Margin £: <strong id="mbActualMargin" class="text-emerald-600 dark:text-emerald-400">£54,391.66</strong></span>
+            <span id="mbVarMarginBadge" class="font-bold text-emerald-600 dark:text-emerald-400">+£3,691.66 ▲</span>
+          </div>
+        </div>
+
+        <!-- Scorecard 4: Cumulative YTD vs Annual Target -->
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs relative">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Year-to-Date Performance</span>
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm">
+              <i class="fa-solid fa-calendar-week"></i>
+            </div>
+          </div>
+          <div class="text-2xl font-black text-slate-900 dark:text-white tracking-tight" id="mbYtdActual">£1,718,772.69</div>
+          <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+            <span class="text-slate-500 dark:text-slate-400">YTD Budget: <strong id="mbYtdBudget" class="text-slate-700 dark:text-slate-200">£1,690,000.00</strong></span>
+            <span id="mbYtdVarianceBadge" class="font-bold text-emerald-600 dark:text-emerald-400">+£28,772.69 (+1.7%) ▲</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Line Chart: Budget vs Actual / YTD vs Last Year -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <i class="fa-solid fa-chart-line text-sky-600 dark:text-sky-400"></i>
+              Performance Comparison: Budget, Actual / YTD & Last Year (2026)
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Tracking monthly pacing against target and historical prior year trajectory</p>
+          </div>
+
+          <!-- Chart Mode Switcher -->
+          <div class="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+            <button id="btnLineChartMonthly" class="px-3 py-1 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs transition-all">
+              Monthly View
+            </button>
+            <button id="btnLineChartYtd" class="px-3 py-1 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">
+              Cumulative (YTD) View
+            </button>
+          </div>
+        </div>
+
+        <div class="relative h-80">
+          <canvas id="chartBudgetComparison"></canvas>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-center gap-6 text-xs font-medium">
+          <span class="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+            <span class="w-3.5 h-1 border-t-2 border-dashed border-indigo-600 dark:border-indigo-400 inline-block"></span>
+            <strong>Budget Target</strong>
+          </span>
+          <span class="flex items-center gap-2 text-sky-600 dark:text-sky-400">
+            <span class="w-3.5 h-1 bg-sky-600 dark:bg-sky-400 inline-block rounded"></span>
+            <strong id="lblActualLegend">Actual (Completed Months)</strong>
+          </span>
+          <span class="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <span class="w-3.5 h-1 bg-amber-500 dark:bg-amber-400 inline-block rounded"></span>
+            <strong>Last Year (2025)</strong>
+          </span>
+        </div>
+      </div>
+
+      <!-- 12-Month Comparison Matrix Table -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden">
+        <div class="p-4 sm:px-6 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <i class="fa-solid fa-table text-sky-600 dark:text-sky-400"></i>
+              Full Year Monthly Performance & Budget Variance Table (2026)
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Monthly breakdown of actuals, budgets, prior year benchmarks, and Up/Down status</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+            <thead class="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-200 dark:border-slate-800">
+              <tr>
+                <th class="py-3 px-4">Month</th>
+                <th class="py-3 px-4 text-right">Actual Sales (£)</th>
+                <th class="py-3 px-4 text-right">Budget Sales (£)</th>
+                <th class="py-3 px-4 text-right">Var vs Budget (£)</th>
+                <th class="py-3 px-4 text-center">vs Budget %</th>
+                <th class="py-3 px-4 text-right">Last Year Sales (£)</th>
+                <th class="py-3 px-4 text-right">Var vs Last Year (£)</th>
+                <th class="py-3 px-4 text-center">vs Last Year %</th>
+                <th class="py-3 px-4 text-center">Act / Bud Margin %</th>
+                <th class="py-3 px-4 text-center">Monthly Status</th>
+                <th class="py-3 px-4 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="monthlyTableBody" class="divide-y divide-slate-100 dark:divide-slate-800">
+              <!-- Populated via JS -->
+            </tbody>
+            <tfoot id="monthlyTableFoot" class="bg-slate-50 dark:bg-slate-950/90 text-slate-900 dark:text-white font-bold text-xs border-t-2 border-slate-300 dark:border-slate-700">
+              <!-- Populated via JS -->
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Edit Monthly Figures Modal (Budget, Actual, Last Year) -->
+  <div id="editBudgetModal" class="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 text-slate-800 dark:text-slate-100">
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 dark:text-white" id="editBudgetTitle">Input / Edit Monthly Figures</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Enter Budget, Actual Sales, and Last Year figures for the same month</p>
+          </div>
+        </div>
+        <button id="btnCloseEditBudget" class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formEditBudget" class="space-y-4">
+        <!-- Month Selection -->
+        <div>
+          <label for="editSelectMonth" class="block text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-1">Select Month:</label>
+          <select id="editSelectMonth" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+            <option value="1">January 2026</option>
+            <option value="2">February 2026</option>
+            <option value="3">March 2026</option>
+            <option value="4">April 2026</option>
+            <option value="5">May 2026</option>
+            <option value="6">June 2026</option>
+            <option value="7">July 2026</option>
+            <option value="8" selected>August 2026</option>
+            <option value="9">September 2026</option>
+            <option value="10">October 2026</option>
+            <option value="11">November 2026</option>
+            <option value="12">December 2026</option>
+          </select>
+        </div>
+
+        <!-- Section 1: Budget Target -->
+        <div class="p-3 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 space-y-2">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">
+            <i class="fa-solid fa-bullseye text-[11px]"></i>
+            <span>1. Budget Target (2026)</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="inputBudgetSales" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Budget Sales (£):</label>
+              <input type="number" step="0.01" id="inputBudgetSales" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono font-semibold text-slate-800 dark:text-slate-200" placeholder="e.g. 195000.00" required>
+            </div>
+            <div>
+              <label for="inputBudgetMarginPct" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Budget Margin %:</label>
+              <input type="number" step="0.1" id="inputBudgetMarginPct" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 dark:text-slate-200" placeholder="e.g. 26.0">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Actual Sales Figures (for the same month) -->
+        <div class="p-3 rounded-xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/40 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider">
+              <i class="fa-solid fa-chart-line text-[11px]"></i>
+              <span>2. Actual Sales (For This Month)</span>
+            </div>
+            <span class="text-[10px] text-slate-400">Direct Entry / Override</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="inputActualSales" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Actual Sales (£):</label>
+              <input type="number" step="0.01" id="inputActualSales" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono font-semibold text-sky-700 dark:text-sky-300" placeholder="e.g. 203496.89 (leave blank if pending)">
+            </div>
+            <div>
+              <label for="inputActualMarginPct" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Actual Margin %:</label>
+              <input type="number" step="0.1" id="inputActualMarginPct" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 dark:text-slate-200" placeholder="e.g. 26.7">
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-500 dark:text-slate-400">Enter actual sales for this month. Leave blank to clear manual entry or use uploaded CSV data.</p>
+        </div>
+
+        <!-- Section 3: Last Year Benchmark (Same Month 2025) -->
+        <div class="p-3 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 space-y-2">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+            <i class="fa-solid fa-clock-rotate-left text-[11px]"></i>
+            <span>3. Last Year Figures (Same Month 2025)</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="inputPriorSales" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Last Year Sales (£):</label>
+              <input type="number" step="0.01" id="inputPriorSales" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono font-semibold text-amber-700 dark:text-amber-400" placeholder="e.g. 185200.00" required>
+            </div>
+            <div>
+              <label for="inputPriorMarginPct" class="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Last Year Margin %:</label>
+              <input type="number" step="0.1" id="inputPriorMarginPct" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 dark:text-slate-200" placeholder="e.g. 25.5">
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label for="inputBudgetNotes" class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Notes / Target Description:</label>
+          <input type="text" id="inputBudgetNotes" placeholder="e.g. Adjusted targets & seasonal promotions" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200">
+        </div>
+
+        <div id="editBudgetStatus" class="hidden p-2.5 rounded-lg text-xs"></div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <button type="button" id="btnCancelEditBudget" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300">
+            Cancel
+          </button>
+          <button type="submit" id="btnSaveBudget" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-semibold text-white shadow-xs flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Save Monthly Figures
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Upload Modal -->
+  <div id="uploadModal" class="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 text-slate-800 dark:text-slate-100">
+      
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+            <i class="fa-solid fa-file-arrow-up"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 dark:text-white">Upload Roofing Data (Monthly / Incremental)</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Supports monthly .csv, .tsv, or tab-separated exports</p>
+          </div>
+        </div>
+        <button id="btnCloseUpload" class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Ingestion Mode Selection -->
+      <div class="bg-slate-50 dark:bg-slate-950/60 p-3 rounded-lg border border-slate-200 dark:border-slate-800 text-xs space-y-2">
+        <div class="font-semibold text-slate-700 dark:text-slate-300">Ingestion Behavior:</div>
+        <div class="flex items-center gap-4">
+          <label class="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="radio" name="uploadMode" value="append" checked class="text-sky-600 focus:ring-sky-500">
+            <span class="text-slate-700 dark:text-slate-300 font-medium">Incremental Append (New Monthly Batch)</span>
+          </label>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="radio" name="uploadMode" value="overwrite" class="text-sky-600 focus:ring-sky-500">
+            <span class="text-slate-700 dark:text-slate-300">Replace/Update existing for this date</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Tab Switcher: File Upload vs Paste Text -->
+      <div class="flex border-b border-slate-200 dark:border-slate-700 text-xs font-semibold">
+        <button id="tabBtnFile" class="py-2 px-4 text-sky-600 dark:text-sky-400 border-b-2 border-sky-500 transition-colors">
+          <i class="fa-solid fa-upload mr-1.5"></i> File Upload
+        </button>
+        <button id="tabBtnPaste" class="py-2 px-4 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+          <i class="fa-solid fa-paste mr-1.5"></i> Paste CSV / TSV
+        </button>
+      </div>
+
+      <!-- Tab 1: File Dropzone -->
+      <div id="tabContentFile" class="space-y-4">
+        <div id="dropzone" class="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-sky-500 dark:hover:border-sky-500 rounded-xl p-8 text-center cursor-pointer transition-colors bg-slate-50/60 dark:bg-slate-950/40">
+          <i class="fa-solid fa-cloud-arrow-up text-3xl text-sky-500 mb-2"></i>
+          <p class="text-sm text-slate-700 dark:text-slate-200 font-medium">Drag & drop your roofing report here, or click to browse</p>
+          <p class="text-xs text-slate-400 mt-1">Supports CSV, TSV (tab-separated), or TXT up to 15MB</p>
+          <input type="file" id="fileInput" accept=".csv,.tsv,.txt" class="hidden">
+        </div>
+        <div id="selectedFileInfo" class="hidden bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-xs flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-file-lines text-sky-600 dark:text-sky-400"></i>
+            <span id="selectedFileName" class="text-slate-800 dark:text-white font-medium">filename.csv</span>
+            <span id="selectedFileSize" class="text-slate-400">(0 KB)</span>
+          </div>
+          <button id="btnRemoveFile" class="text-slate-400 hover:text-rose-500"><i class="fa-solid fa-trash-can"></i></button>
+        </div>
+      </div>
+
+      <!-- Tab 2: Paste Raw Data -->
+      <div id="tabContentPaste" class="hidden space-y-2">
+        <label for="pasteContent" class="text-xs text-slate-600 dark:text-slate-300 font-medium">Paste CSV or tab-separated text directly:</label>
+        <textarea id="pasteContent" rows="8" placeholder="Date	TOSM	TOSM description	SubGroup	SubGroup description	Sales	Cost	Margin..." class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-xs text-slate-800 dark:text-slate-200 font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none"></textarea>
+      </div>
+
+      <!-- Upload Status / Error Display -->
+      <div id="uploadStatus" class="hidden p-3 rounded-lg text-xs"></div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
+        <button id="btnResetSeed" class="text-xs text-slate-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 font-medium transition-colors flex items-center gap-1.5" title="Reset database to the baseline August 2026 dataset">
+          <i class="fa-solid fa-rotate-left"></i> Reset to Sample Data
+        </button>
+        <div class="flex items-center gap-2">
+          <button id="btnCancelUpload" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors">
+            Cancel
+          </button>
+          <button id="btnSubmitUpload" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-semibold text-white shadow-xs transition-colors flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Process & Ingest
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Batches History Modal -->
+  <div id="batchesModal" class="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 text-slate-800 dark:text-slate-100">
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-database text-sky-600 dark:text-sky-400"></i>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">Uploaded Monthly Batches</h3>
+        </div>
+        <button id="btnCloseBatches" class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="text-xs text-slate-600 dark:text-slate-300">
+        <p>Current Database Engine: <strong id="batchesDbDialect" class="text-sky-600 dark:text-sky-400 uppercase">SQLite</strong></p>
+        <p class="text-slate-500 dark:text-slate-400 mt-0.5">Incremental uploads append records for historical MoM analysis. You can also delete any unwanted batch.</p>
+      </div>
+
+      <div class="max-h-72 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-lg">
+        <table class="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+          <thead class="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+            <tr>
+              <th class="p-2.5">Batch</th>
+              <th class="p-2.5">Filename</th>
+              <th class="p-2.5 text-right">Rows</th>
+              <th class="p-2.5 text-right">Period Sales</th>
+              <th class="p-2.5">Period Date</th>
+              <th class="p-2.5">Uploaded</th>
+              <th class="p-2.5 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="batchesTableBody" class="divide-y divide-slate-100 dark:divide-slate-800">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-end pt-3 border-t border-slate-200 dark:border-slate-800">
+        <button id="btnDismissBatches" class="px-4 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>

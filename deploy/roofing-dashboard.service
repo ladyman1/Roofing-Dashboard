@@ -1,0 +1,23 @@
+[Unit]
+Description=Roofing Department Reporting Dashboard
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/var/www/roofing-dashboard
+ExecStart=/usr/bin/node /var/www/roofing-dashboard/src/server.js
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=roofing-dashboard
+Environment=NODE_ENV=production
+Environment=PORT=3999
+# Configure SQLite:
+Environment=DATABASE_URL=sqlite:./data/roofing.db
+# Or PostgreSQL:
+# Environment=DATABASE_URL=postgresql://roofing_user:your_password@127.0.0.1:5432/roofing_db
+
+[Install]
+WantedBy=multi-user.target
