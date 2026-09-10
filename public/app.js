@@ -129,9 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
     mbVarPriorSales: document.getElementById('mbVarPriorSales'),
     mbPriorSales: document.getElementById('mbPriorSales'),
     mbVarPriorBadge: document.getElementById('mbVarPriorBadge'),
-    mbActualMarginPct: document.getElementById('mbActualMarginPct'),
-    mbActualMargin: document.getElementById('mbActualMargin'),
-    mbVarMarginBadge: document.getElementById('mbVarMarginBadge'),
     mbYtdActual: document.getElementById('mbYtdActual'),
     mbYtdBudget: document.getElementById('mbYtdBudget'),
     mbYtdVarianceBadge: document.getElementById('mbYtdVarianceBadge'),
@@ -145,11 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
     formEditBudget: document.getElementById('formEditBudget'),
     editSelectMonth: document.getElementById('editSelectMonth'),
     inputBudgetSales: document.getElementById('inputBudgetSales'),
-    inputBudgetMarginPct: document.getElementById('inputBudgetMarginPct'),
     inputActualSales: document.getElementById('inputActualSales'),
-    inputActualMarginPct: document.getElementById('inputActualMarginPct'),
     inputPriorSales: document.getElementById('inputPriorSales'),
-    inputPriorMarginPct: document.getElementById('inputPriorMarginPct'),
     inputBudgetNotes: document.getElementById('inputBudgetNotes'),
     editBudgetStatus: document.getElementById('editBudgetStatus'),
 
@@ -614,10 +608,6 @@ document.addEventListener('DOMContentLoaded', () => {
           ? 'px-2 py-0.5 rounded font-bold text-[11px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
           : 'px-2 py-0.5 rounded font-bold text-[11px] bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-400 border border-rose-200 dark:border-rose-800';
 
-        el.mbActualMarginPct.textContent = formatPct(mData.actual_margin_pct);
-        el.mbActualMargin.textContent = formatCurrency(mData.actual_margin);
-        el.mbVarMarginBadge.textContent = `${mData.var_budget_margin >= 0 ? '+' : ''}${formatCurrency(mData.var_budget_margin)} (${mData.var_budget_margin >= 0 ? '▲' : '▼'})`;
-
         el.monthlyStatusBadge.textContent = `${mData.month_name} 2026: Actuals Ingested & Verified`;
         el.monthlyStatusBadge.className = 'text-xs px-2.5 py-1 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold';
       } else {
@@ -627,10 +617,6 @@ document.addEventListener('DOMContentLoaded', () => {
         el.mbPriorSales.textContent = formatCurrency(mData.prior_year_sales);
         el.mbVarPriorBadge.textContent = 'Target Only';
         el.mbVarPriorBadge.className = 'px-2 py-0.5 rounded text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-medium';
-
-        el.mbActualMarginPct.textContent = '—';
-        el.mbActualMargin.textContent = '—';
-        el.mbVarMarginBadge.textContent = `Target: ${mData.budget_margin_pct.toFixed(1)}%`;
 
         el.monthlyStatusBadge.textContent = `${mData.month_name} 2026: Target Active (No Actuals Uploaded Yet)`;
         el.monthlyStatusBadge.className = 'text-xs px-2.5 py-1 rounded bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-semibold';
@@ -774,9 +760,6 @@ document.addEventListener('DOMContentLoaded', () => {
           <td class="py-2.5 px-4 text-right font-mono text-amber-600 dark:text-amber-400">${formatCurrency(m.prior_year_sales)}</td>
           <td class="py-2.5 px-4 text-right font-mono ${varPriorClass}">${m.has_actual ? `${m.is_up_prior ? '+' : ''}${formatCurrency(m.var_prior_sales)}` : '—'}</td>
           <td class="py-2.5 px-4 text-center font-mono ${varPriorClass}">${m.has_actual ? formatPct(m.var_prior_pct, true) : '—'}</td>
-          <td class="py-2.5 px-4 text-center font-mono text-slate-600 dark:text-slate-300">
-            ${m.has_actual ? `${m.actual_margin_pct.toFixed(1)}% / ` : '— / '}<span class="text-indigo-500">${m.budget_margin_pct.toFixed(1)}%</span>
-          </td>
           <td class="py-2.5 px-4 text-center">${statusBadge}</td>
           <td class="py-2.5 px-4 text-center">
             ${state.user && state.user.role === 'admin' ? `
@@ -805,7 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td class="py-3 px-4 text-right text-amber-600 dark:text-amber-400">${formatCurrency(totPrior)}</td>
         <td class="py-3 px-4 text-right ${totVarPrior >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">${totVarPrior >= 0 ? '+' : ''}${formatCurrency(totVarPrior)}</td>
         <td class="py-3 px-4 text-center ${totVarPrior >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">${formatPct(totVarPriorPct, true)}</td>
-        <td class="py-3 px-4 text-center text-slate-400" colspan="3">12 Months Managed</td>
+        <td class="py-3 px-4 text-center text-slate-400" colspan="2">12 Months Managed</td>
       </tr>
     `;
 
@@ -847,15 +830,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const mData = data.months.find(m => m.month === monthNum);
       if (mData) {
         el.inputBudgetSales.value = mData.budget_sales !== null && mData.budget_sales !== undefined ? mData.budget_sales : '';
-        el.inputBudgetMarginPct.value = mData.budget_margin_pct !== null && mData.budget_margin_pct !== undefined ? mData.budget_margin_pct : 26.0;
         
         // Actual figures (display if recorded, otherwise blank)
         el.inputActualSales.value = mData.has_actual && mData.actual_sales !== null ? mData.actual_sales : '';
-        el.inputActualMarginPct.value = mData.has_actual && mData.actual_margin_pct !== null ? mData.actual_margin_pct : '';
 
         // Last year figures
         el.inputPriorSales.value = mData.prior_year_sales !== null && mData.prior_year_sales !== undefined ? mData.prior_year_sales : '';
-        el.inputPriorMarginPct.value = mData.prior_year_margin_pct !== null && mData.prior_year_margin_pct !== undefined ? mData.prior_year_margin_pct : 25.5;
         
         el.inputBudgetNotes.value = '';
       }
@@ -884,15 +864,12 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const month = parseInt(el.editSelectMonth.value, 10);
     const budgetSales = el.inputBudgetSales.value !== '' ? Number(el.inputBudgetSales.value) : 0;
-    const budgetMarginPct = el.inputBudgetMarginPct.value !== '' ? Number(el.inputBudgetMarginPct.value) : 26.0;
 
     // Actual sales: null if blank (clears manual or falls back to CSV), number if filled
     const actualSales = el.inputActualSales.value !== '' ? Number(el.inputActualSales.value) : null;
-    const actualMarginPct = el.inputActualMarginPct.value !== '' ? Number(el.inputActualMarginPct.value) : null;
 
     // Last year / Prior year figures
     const priorYearSales = el.inputPriorSales.value !== '' ? Number(el.inputPriorSales.value) : 0;
-    const priorYearMarginPct = el.inputPriorMarginPct.value !== '' ? Number(el.inputPriorMarginPct.value) : 25.5;
     const notes = el.inputBudgetNotes.value.trim();
 
     try {
@@ -902,11 +879,8 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({
           year: 2026,
           budget_sales: budgetSales,
-          budget_margin_pct: budgetMarginPct,
           actual_sales: actualSales,
-          actual_margin_pct: actualMarginPct,
           prior_year_sales: priorYearSales,
-          prior_year_margin_pct: priorYearMarginPct,
           notes
         })
       });

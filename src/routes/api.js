@@ -935,14 +935,15 @@ router.put('/monthly-budgets/:month', requireAuth, requireAdmin, async (req, res
     }
 
     const year = parseInt(req.body.year, 10) || 2026;
+    const existing = await db('monthly_budgets').where({ year, month }).first();
 
     // Budget figures
     const budgetSales = req.body.budget_sales !== undefined && req.body.budget_sales !== null && req.body.budget_sales !== ''
       ? Number(req.body.budget_sales)
-      : 0;
+      : (existing ? Number(existing.budget_sales) : 0);
     let budgetMarginPct = req.body.budget_margin_pct !== undefined && req.body.budget_margin_pct !== ''
       ? Number(req.body.budget_margin_pct)
-      : 26.0;
+      : (existing && existing.budget_margin_pct !== null ? Number(existing.budget_margin_pct) : 26.0);
     let budgetMargin = req.body.budget_margin !== undefined && req.body.budget_margin !== ''
       ? Number(req.body.budget_margin)
       : Number((budgetSales * (budgetMarginPct / 100)).toFixed(2));
@@ -955,7 +956,7 @@ router.put('/monthly-budgets/:month', requireAuth, requireAdmin, async (req, res
       actualSales = Number(req.body.actual_sales);
       actualMarginPct = req.body.actual_margin_pct !== undefined && req.body.actual_margin_pct !== ''
         ? Number(req.body.actual_margin_pct)
-        : budgetMarginPct;
+        : (existing && existing.actual_margin_pct !== null ? Number(existing.actual_margin_pct) : budgetMarginPct);
       actualMargin = req.body.actual_margin !== undefined && req.body.actual_margin !== ''
         ? Number(req.body.actual_margin)
         : Number((actualSales * (actualMarginPct / 100)).toFixed(2));
@@ -964,15 +965,14 @@ router.put('/monthly-budgets/:month', requireAuth, requireAdmin, async (req, res
     // Prior year / Last year figures
     const priorYearSales = req.body.prior_year_sales !== undefined && req.body.prior_year_sales !== null && req.body.prior_year_sales !== ''
       ? Number(req.body.prior_year_sales)
-      : 0;
+      : (existing ? Number(existing.prior_year_sales) : 0);
     let priorYearMarginPct = req.body.prior_year_margin_pct !== undefined && req.body.prior_year_margin_pct !== ''
       ? Number(req.body.prior_year_margin_pct)
-      : 25.5;
+      : (existing && existing.prior_year_margin_pct !== null ? Number(existing.prior_year_margin_pct) : 25.5);
     let priorYearMargin = req.body.prior_year_margin !== undefined && req.body.prior_year_margin !== ''
       ? Number(req.body.prior_year_margin)
       : Number((priorYearSales * (priorYearMarginPct / 100)).toFixed(2));
 
-    const existing = await db('monthly_budgets').where({ year, month }).first();
     const updatePayload = {
       budget_sales: budgetSales,
       budget_margin: budgetMargin,

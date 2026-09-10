@@ -167,6 +167,34 @@ async function runTests() {
   });
   const m9Reset = await db('monthly_budgets').where({ year: 2026, month: 9 }).first();
   assert.strictEqual(m9Reset.actual_sales, null, 'Actual sales should be reset to null');
+
+  // Test 10b: Updating figures without requiring margin fields (sales figures only)
+  console.log('[TEST 10b] Verifying updating monthly figures without requiring margin fields...');
+  const m10Before = await db('monthly_budgets').where({ year: 2026, month: 10 }).first();
+  const originalMarginPct = Number(m10Before.budget_margin_pct);
+
+  // Simulate updating sales figures without passing margin fields
+  const newBudgetSales = 205000;
+  const newPriorYearSales = 192000;
+  const newActualSales = 208000;
+  const computedBudgetMargin = Number((newBudgetSales * (originalMarginPct / 100)).toFixed(2));
+  const computedActualMargin = Number((newActualSales * (originalMarginPct / 100)).toFixed(2));
+
+  await db('monthly_budgets').where({ year: 2026, month: 10 }).update({
+    budget_sales: newBudgetSales,
+    budget_margin: computedBudgetMargin,
+    actual_sales: newActualSales,
+    actual_margin: computedActualMargin,
+    prior_year_sales: newPriorYearSales
+  });
+
+  const m10Updated = await db('monthly_budgets').where({ year: 2026, month: 10 }).first();
+  assert.strictEqual(Number(m10Updated.budget_sales), 205000, 'Budget sales updated');
+  assert.strictEqual(Number(m10Updated.actual_sales), 208000, 'Actual sales updated');
+  assert.strictEqual(Number(m10Updated.prior_year_sales), 192000, 'Prior year sales updated');
+  assert.strictEqual(Number(m10Updated.budget_margin_pct), originalMarginPct, 'Margin pct preserved');
+  console.log('✓ Updating sales figures only (without margin inputs) verified.');
+
   // Test 11: Authentication & Default Admin Seeding
   console.log('[TEST 11] Verifying Default Admin Seeding and Password Verification...');
   const { hashPassword, verifyPassword, createToken, verifyToken, requireAuth, requireAdmin } = require('../src/services/auth');
