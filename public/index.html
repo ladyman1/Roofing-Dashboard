@@ -798,9 +798,14 @@
 
       <!-- Modal Footer -->
       <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
-        <button id="btnResetSeed" class="text-xs text-slate-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 font-medium transition-colors flex items-center gap-1.5" title="Reset database to the baseline August 2026 dataset">
-          <i class="fa-solid fa-rotate-left"></i> Reset to Sample Data
-        </button>
+        <div class="flex items-center gap-3">
+          <button id="btnResetSeed" class="text-xs text-slate-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 font-medium transition-colors flex items-center gap-1.5" title="Reset database to the baseline August 2026 dataset">
+            <i class="fa-solid fa-rotate-left"></i> Reset to Sample Data
+          </button>
+          <button id="btnClearAllData" class="text-xs text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium transition-colors flex items-center gap-1.5" title="Clear all imported sales records and batches to start fresh">
+            <i class="fa-solid fa-trash-can"></i> Clear All Imported Data
+          </button>
+        </div>
         <div class="flex items-center gap-2">
           <button id="btnCancelUpload" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors">
             Cancel
@@ -851,7 +856,10 @@
         </table>
       </div>
 
-      <div class="flex justify-end pt-3 border-t border-slate-200 dark:border-slate-800">
+      <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
+        <button id="btnClearAllBatches" class="text-xs text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium transition-colors flex items-center gap-1.5" title="Clear all imported batches and records">
+          <i class="fa-solid fa-trash-can"></i> Clear All Batches
+        </button>
         <button id="btnDismissBatches" class="px-4 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200">
           Close
         </button>

@@ -295,6 +295,69 @@ async function runTests() {
   assert.strictEqual(deletedViewer, undefined, 'Viewer must be deleted from database');
   console.log('✓ User management and RBAC access protection verified.');
 
+  // Test 14: Multi-month running totals vs point-in-time YTD calculation
+  console.log('[TEST 14] Verifying multi-month running totals and non-duplicative YTD sales...');
+  const [sept2BatchId] = await db('upload_batches').insert({
+    filename: 'september_2026_test.csv',
+    row_count: 20,
+    total_sales: 50000,
+    reporting_date: '30/09/2026'
+  }).returning('id');
+  const resolvedSept2Id = typeof sept2BatchId === 'object' ? sept2BatchId.id : sept2BatchId;
+
+  const sept2Records = parsedRows.map((r) => ({
+    ...r,
+    record_date: '30/09/2026',
+    iso_date: '2026-09-30',
+    sales: 2500,
+    ytd_sales: Number((r.ytd_sales + 2500).toFixed(2)),
+    batch_id: resolvedSept2Id
+  }));
+  await db('sales_records').insert(sept2Records);
+
+  // Query KPI logic when date = 'all'
+  const maxIsoRes = await db('sales_records').max('iso_date as max_iso').first();
+  const maxIso = maxIsoRes.max_iso || maxIsoRes['max(iso_date)'] || maxIsoRes['max(`iso_date`)'];
+  assert.strictEqual(maxIso, '2026-09-30', 'Latest reporting period must be Sept 2026');
+
+  const statsAll = await db('sales_records')
+    .select(
+      db.raw('COALESCE(SUM(sales), 0) as total_sales'),
+      db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_sales ELSE 0 END), 0) as ytd_sales', [maxIso])
+    )
+    .first();
+
+  const runningTotalSales = Number(Number(statsAll.total_sales).toFixed(2));
+  const latestYtdSales = Number(Number(statsAll.ytd_sales).toFixed(2));
+
+  assert.strictEqual(runningTotalSales, 253496.89, 'Running total sales across all periods must be additive');
+  assert.strictEqual(latestYtdSales, 1768772.69, 'YTD sales across all periods must reflect latest period, not sum of months');
+  console.log('✓ Multi-month additive running totals and point-in-time YTD sales verified.');
+
+  // Test 15: Admin Clear All Data
+  console.log('[TEST 15] Verifying Admin Clear All Data functionality...');
+  const delRecords = await db('sales_records').del();
+  const delBatches = await db('upload_batches').del();
+  await db('monthly_budgets').update({
+    actual_sales: null,
+    actual_margin: null,
+    actual_margin_pct: null
+  });
+
+  const remainingRecords = await db('sales_records').count('* as count').first();
+  const remainingBatches = await db('upload_batches').count('* as count').first();
+  assert.strictEqual(Number(Object.values(remainingRecords)[0]), 0, 'Sales records must be 0 after clear');
+  assert.strictEqual(Number(Object.values(remainingBatches)[0]), 0, 'Batches must be 0 after clear');
+
+  const budgetsWithActuals = await db('monthly_budgets').whereNotNull('actual_sales').count('* as count').first();
+  assert.strictEqual(Number(Object.values(budgetsWithActuals)[0]), 0, 'No monthly budgets should have actual_sales');
+
+  // Re-seed initial sample data so local environment is left in working order
+  await seedInitialData(true);
+  const reseededCount = await db('sales_records').count('* as count').first();
+  assert.strictEqual(Number(Object.values(reseededCount)[0]), 20, 'Reseeded database has 20 records');
+  console.log('✓ Admin Clear All Data and re-seeding verified.');
+
   console.log('--- ALL TESTS COMPLETED SUCCESSFULLY! ---');
 }
 

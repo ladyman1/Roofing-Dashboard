@@ -78,8 +78,8 @@ async function seedDefaultUsers(force = false) {
 }
 
 async function seedInitialData(force = false) {
-  // Ensure default admin user is seeded
-  await seedDefaultUsers(force);
+  // Ensure default admin user is seeded (never delete existing users on sample data reset)
+  await seedDefaultUsers(false);
 
   // Always ensure budgets are seeded
   await seedMonthlyBudgets(force);

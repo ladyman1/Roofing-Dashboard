@@ -164,11 +164,13 @@ document.addEventListener('DOMContentLoaded', () => {
     pasteContent: document.getElementById('pasteContent'),
     btnSubmitUpload: document.getElementById('btnSubmitUpload'),
     btnResetSeed: document.getElementById('btnResetSeed'),
+    btnClearAllData: document.getElementById('btnClearAllData'),
     uploadStatus: document.getElementById('uploadStatus'),
 
     batchesModal: document.getElementById('batchesModal'),
     btnCloseBatches: document.getElementById('btnCloseBatches'),
     btnDismissBatches: document.getElementById('btnDismissBatches'),
+    btnClearAllBatches: document.getElementById('btnClearAllBatches'),
     batchesDbDialect: document.getElementById('batchesDbDialect'),
     batchesTableBody: document.getElementById('batchesTableBody'),
 
@@ -378,6 +380,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         state.date = el.filterDate.value;
+      } else {
+        el.filterDate.innerHTML = '<option value="all">No Data Uploaded</option>';
+        state.date = 'all';
       }
     } catch (e) {
       console.warn('Could not load dates', e);
@@ -1364,6 +1369,43 @@ document.addEventListener('DOMContentLoaded', () => {
       showUploadStatus(e.message, 'error');
     }
   });
+
+  // Clear All Imported Data (Admin Only)
+  async function clearAllImportedData() {
+    if (!confirm('Are you sure you want to delete ALL imported batches and sales records? This will clear all data and start completely fresh. This cannot be undone.')) {
+      return;
+    }
+    try {
+      const res = await apiFetch('/api/clear-all-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        showUploadStatus(`All imported data cleared! (${data.deleted_records} records removed)`, 'success');
+        await loadDates();
+        await reloadAll();
+        if (el.batchesModal && !el.batchesModal.classList.contains('hidden')) {
+          await refreshBatchesList();
+        }
+        setTimeout(() => {
+          closeUploadModal();
+        }, 1200);
+      } else {
+        alert(data.error || 'Failed to clear data');
+      }
+    } catch (e) {
+      alert('Error clearing data: ' + e.message);
+    }
+  }
+
+  if (el.btnClearAllData) {
+    el.btnClearAllData.addEventListener('click', clearAllImportedData);
+  }
+
+  if (el.btnClearAllBatches) {
+    el.btnClearAllBatches.addEventListener('click', clearAllImportedData);
+  }
 
   // Batches Modal with Delete Batch support
   async function refreshBatchesList() {

@@ -307,6 +307,17 @@ router.get('/kpis', requireAuth, async (req, res) => {
   try {
     const { date, tosm } = req.query;
 
+    const isAllDates = !date || date === 'all';
+    let maxIso = null;
+    if (isAllDates) {
+      let maxIsoQuery = db('sales_records');
+      if (tosm !== undefined && tosm !== null && tosm !== 'all' && tosm !== '') {
+        maxIsoQuery.where('tosm', parseInt(tosm, 10));
+      }
+      const maxIsoRes = await maxIsoQuery.max('iso_date as max_iso').first();
+      maxIso = maxIsoRes ? maxIsoRes.max_iso : null;
+    }
+
     let baseQuery = db('sales_records');
     applyFilters(baseQuery, { date, tosm });
 
@@ -318,12 +329,24 @@ router.get('/kpis', requireAuth, async (req, res) => {
         db.raw('COALESCE(SUM(quantity), 0) as total_quantity'),
         db.raw('COALESCE(SUM(invoice_tx_count), 0) as total_invoices'),
         db.raw('COALESCE(SUM(credit_tx_count), 0) as total_credits'),
-        db.raw('COALESCE(SUM(ytd_sales), 0) as ytd_sales'),
-        db.raw('COALESCE(SUM(ytd_cost), 0) as ytd_cost'),
-        db.raw('COALESCE(SUM(ytd_margin), 0) as ytd_margin'),
-        db.raw('COALESCE(SUM(ytd_quantity), 0) as ytd_quantity'),
-        db.raw('COALESCE(SUM(ytd_invoice_tx_count), 0) as ytd_invoices'),
-        db.raw('COALESCE(SUM(ytd_credit_tx_count), 0) as ytd_credits'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_sales ELSE 0 END), 0) as ytd_sales', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_sales), 0) as ytd_sales'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_cost ELSE 0 END), 0) as ytd_cost', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_cost), 0) as ytd_cost'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_margin ELSE 0 END), 0) as ytd_margin', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_margin), 0) as ytd_margin'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_quantity ELSE 0 END), 0) as ytd_quantity', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_quantity), 0) as ytd_quantity'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_invoice_tx_count ELSE 0 END), 0) as ytd_invoices', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_invoice_tx_count), 0) as ytd_invoices'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_credit_tx_count ELSE 0 END), 0) as ytd_credits', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_credit_tx_count), 0) as ytd_credits'),
         db.raw('COUNT(*) as record_count')
       )
       .first();
@@ -402,6 +425,17 @@ router.get('/subgroups', requireAuth, async (req, res) => {
   try {
     const { date, tosm, sortBy = 'sales', order = 'desc' } = req.query;
 
+    const isAllDates = !date || date === 'all';
+    let maxIso = null;
+    if (isAllDates) {
+      let maxIsoQuery = db('sales_records');
+      if (tosm !== undefined && tosm !== null && tosm !== 'all' && tosm !== '') {
+        maxIsoQuery.where('tosm', parseInt(tosm, 10));
+      }
+      const maxIsoRes = await maxIsoQuery.max('iso_date as max_iso').first();
+      maxIso = maxIsoRes ? maxIsoRes.max_iso : null;
+    }
+
     let query = db('sales_records');
     applyFilters(query, { date, tosm });
 
@@ -415,12 +449,24 @@ router.get('/subgroups', requireAuth, async (req, res) => {
         db.raw('COALESCE(SUM(quantity), 0) as quantity'),
         db.raw('COALESCE(SUM(invoice_tx_count), 0) as invoices'),
         db.raw('COALESCE(SUM(credit_tx_count), 0) as credits'),
-        db.raw('COALESCE(SUM(ytd_sales), 0) as ytd_sales'),
-        db.raw('COALESCE(SUM(ytd_cost), 0) as ytd_cost'),
-        db.raw('COALESCE(SUM(ytd_margin), 0) as ytd_margin'),
-        db.raw('COALESCE(SUM(ytd_quantity), 0) as ytd_quantity'),
-        db.raw('COALESCE(SUM(ytd_invoice_tx_count), 0) as ytd_invoices'),
-        db.raw('COALESCE(SUM(ytd_credit_tx_count), 0) as ytd_credits')
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_sales ELSE 0 END), 0) as ytd_sales', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_sales), 0) as ytd_sales'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_cost ELSE 0 END), 0) as ytd_cost', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_cost), 0) as ytd_cost'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_margin ELSE 0 END), 0) as ytd_margin', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_margin), 0) as ytd_margin'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_quantity ELSE 0 END), 0) as ytd_quantity', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_quantity), 0) as ytd_quantity'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_invoice_tx_count ELSE 0 END), 0) as ytd_invoices', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_invoice_tx_count), 0) as ytd_invoices'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_credit_tx_count ELSE 0 END), 0) as ytd_credits', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_credit_tx_count), 0) as ytd_credits')
       )
       .groupBy('subgroup');
 
@@ -480,6 +526,14 @@ router.get('/subgroups', requireAuth, async (req, res) => {
 router.get('/tosm', requireAuth, async (req, res) => {
   try {
     const { date } = req.query;
+
+    const isAllDates = !date || date === 'all';
+    let maxIso = null;
+    if (isAllDates) {
+      const maxIsoRes = await db('sales_records').max('iso_date as max_iso').first();
+      maxIso = maxIsoRes ? maxIsoRes.max_iso : null;
+    }
+
     let query = db('sales_records');
     applyFilters(query, { date });
 
@@ -493,8 +547,12 @@ router.get('/tosm', requireAuth, async (req, res) => {
         db.raw('COALESCE(SUM(quantity), 0) as quantity'),
         db.raw('COALESCE(SUM(invoice_tx_count), 0) as invoices'),
         db.raw('COALESCE(SUM(credit_tx_count), 0) as credits'),
-        db.raw('COALESCE(SUM(ytd_sales), 0) as ytd_sales'),
-        db.raw('COALESCE(SUM(ytd_margin), 0) as ytd_margin')
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_sales ELSE 0 END), 0) as ytd_sales', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_sales), 0) as ytd_sales'),
+        isAllDates && maxIso
+          ? db.raw('COALESCE(SUM(CASE WHEN iso_date = ? THEN ytd_margin ELSE 0 END), 0) as ytd_margin', [maxIso])
+          : db.raw('COALESCE(SUM(ytd_margin), 0) as ytd_margin')
       )
       .groupBy('tosm', 'tosm_description')
       .orderBy('sales', 'desc');
@@ -599,9 +657,9 @@ router.post('/upload', requireAuth, requireAdmin, upload.single('file'), async (
     const totalSales = rows.reduce((acc, r) => acc + r.sales, 0);
     const reportingDate = rows[0]?.record_date || 'N/A';
 
-    // Optional replacement of existing batch for this date
-    const overwritePeriod = req.body.overwrite_period === true || req.body.overwrite_period === 'true';
-    if (overwritePeriod && reportingDate && reportingDate !== 'N/A') {
+    // Automatically replace existing batch for this reporting period (prevents duplicate doubling)
+    const shouldOverwrite = req.body.overwrite_period === undefined || req.body.overwrite_period === true || req.body.overwrite_period === 'true';
+    if (shouldOverwrite && reportingDate && reportingDate !== 'N/A') {
       const oldBatches = await db('upload_batches').where('reporting_date', reportingDate).select('id');
       const oldBatchIds = oldBatches.map(b => b.id);
       if (oldBatchIds.length > 0) {
@@ -657,6 +715,30 @@ router.delete('/batches/:id', requireAuth, requireAdmin, async (req, res) => {
 
     res.json({ success: true, message: `Batch #${batchId} deleted successfully.` });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Clear all imported data (Admin Only)
+router.post('/clear-all-data', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const delRecords = await db('sales_records').del();
+    const delBatches = await db('upload_batches').del();
+    await db('monthly_budgets').update({
+      actual_sales: null,
+      actual_margin: null,
+      actual_margin_pct: null
+    });
+
+    console.log(`[CLEAR ALL DATA] Admin cleared ${delRecords} sales records and ${delBatches} batches.`);
+    res.json({
+      success: true,
+      message: 'All imported sales data and batches have been cleared.',
+      deleted_records: delRecords,
+      deleted_batches: delBatches
+    });
+  } catch (err) {
+    console.error('[CLEAR ALL DATA ERROR]', err);
     res.status(500).json({ error: err.message });
   }
 });
