@@ -566,7 +566,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Update Scorecards based on focus month or Full Year
     if (focusVal === 'all') {
       const ytd = data.ytd_summary;
-      el.lblMonthActual.textContent = 'Full Year / YTD Actual Sales';
+      const latestMonthName = ytd.latest_month_name || 'August';
+      el.lblMonthActual.textContent = `Full Year / YTD Actual Sales (${latestMonthName} Live)`;
       el.mbActualSales.textContent = formatCurrency(ytd.actual_sales);
       el.mbBudgetSales.textContent = formatCurrency(ytd.budget_sales);
       
@@ -584,7 +585,15 @@ document.addEventListener('DOMContentLoaded', () => {
         ? 'px-2 py-0.5 rounded font-bold text-[11px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
         : 'px-2 py-0.5 rounded font-bold text-[11px] bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-400 border border-rose-200 dark:border-rose-800';
 
-      el.monthlyStatusBadge.textContent = `Full Year 2026 Overview (August Actuals Live)`;
+      // Scorecard 3: Year-to-Date Performance (cumulative through latest month with live actuals)
+      if (el.mbYtdActual) el.mbYtdActual.textContent = formatCurrency(ytd.actual_sales);
+      if (el.mbYtdBudget) el.mbYtdBudget.textContent = formatCurrency(ytd.budget_sales);
+      if (el.mbYtdVarianceBadge) {
+        el.mbYtdVarianceBadge.textContent = `${isUpBud ? '+' : ''}${formatCurrency(ytd.var_budget)} (${isUpBud ? '+' : ''}${ytd.var_budget_pct.toFixed(2)}%) ${isUpBud ? '▲' : '▼'}`;
+        el.mbYtdVarianceBadge.className = isUpBud ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'font-bold text-rose-600 dark:text-rose-400';
+      }
+
+      el.monthlyStatusBadge.textContent = `Full Year 2026 Overview (${latestMonthName} Actuals Live)`;
     } else {
       const monthNum = parseInt(focusVal, 10);
       const mData = data.months.find(m => m.month === monthNum) || data.months[7]; // Default Aug
@@ -620,6 +629,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         el.monthlyStatusBadge.textContent = `${mData.month_name} 2026: Target Active (No Actuals Uploaded Yet)`;
         el.monthlyStatusBadge.className = 'text-xs px-2.5 py-1 rounded bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-semibold';
+      }
+
+      // Scorecard 3: Year-to-Date Performance through selected month
+      if (mData.cum_actual_sales !== null && mData.cum_actual_sales !== undefined) {
+        if (el.mbYtdActual) el.mbYtdActual.textContent = formatCurrency(mData.cum_actual_sales);
+        if (el.mbYtdBudget) el.mbYtdBudget.textContent = formatCurrency(mData.cum_budget_sales);
+        if (el.mbYtdVarianceBadge) {
+          const varYtd = Number((mData.cum_actual_sales - mData.cum_budget_sales).toFixed(2));
+          const varYtdPct = mData.cum_budget_sales > 0 ? (varYtd / mData.cum_budget_sales) * 100 : 0;
+          const isUpYtd = varYtd >= 0;
+          el.mbYtdVarianceBadge.textContent = `${isUpYtd ? '+' : ''}${formatCurrency(varYtd)} (${isUpYtd ? '+' : ''}${varYtdPct.toFixed(2)}%) ${isUpYtd ? '▲' : '▼'}`;
+          el.mbYtdVarianceBadge.className = isUpYtd ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'font-bold text-rose-600 dark:text-rose-400';
+        }
+      } else {
+        if (el.mbYtdActual) el.mbYtdActual.textContent = '—';
+        if (el.mbYtdBudget) el.mbYtdBudget.textContent = formatCurrency(mData.cum_budget_sales);
+        if (el.mbYtdVarianceBadge) {
+          el.mbYtdVarianceBadge.textContent = 'Target Only';
+          el.mbYtdVarianceBadge.className = 'font-medium text-slate-400';
+        }
       }
     }
 

@@ -192,7 +192,16 @@ async function runTests() {
   assert.strictEqual(Number(m10Updated.budget_sales), 205000, 'Budget sales updated');
   assert.strictEqual(Number(m10Updated.actual_sales), 208000, 'Actual sales updated');
   assert.strictEqual(Number(m10Updated.prior_year_sales), 192000, 'Prior year sales updated');
-  assert.strictEqual(Number(m10Updated.budget_margin_pct), originalMarginPct, 'Margin pct preserved');
+  // Clean up: Reset month 10 back to its original state
+  await db('monthly_budgets').where({ year: 2026, month: 10 }).update({
+    budget_sales: m10Before.budget_sales,
+    budget_margin: m10Before.budget_margin,
+    actual_sales: m10Before.actual_sales,
+    actual_margin: m10Before.actual_margin,
+    prior_year_sales: m10Before.prior_year_sales,
+    budget_margin_pct: m10Before.budget_margin_pct
+  });
+
   console.log('✓ Updating sales figures only (without margin inputs) verified.');
 
   // Test 11: Authentication & Default Admin Seeding

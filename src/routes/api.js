@@ -757,7 +757,10 @@ router.get('/monthly-report', requireAuth, async (req, res) => {
       'iso_date',
       'sales',
       'cost',
-      'margin'
+      'margin',
+      'ytd_sales',
+      'ytd_cost',
+      'ytd_margin'
     );
 
     // Group actuals by month (1 - 12)
@@ -778,11 +781,14 @@ router.get('/monthly-report', requireAuth, async (req, res) => {
 
       if (m && m >= 1 && m <= 12) {
         if (!actualsByMonth[m]) {
-          actualsByMonth[m] = { sales: 0, cost: 0, margin: 0 };
+          actualsByMonth[m] = { sales: 0, cost: 0, margin: 0, ytd_sales: 0, ytd_cost: 0, ytd_margin: 0 };
         }
         actualsByMonth[m].sales += Number(r.sales || 0);
         actualsByMonth[m].cost += Number(r.cost || 0);
         actualsByMonth[m].margin += Number(r.margin || 0);
+        actualsByMonth[m].ytd_sales += Number(r.ytd_sales || 0);
+        actualsByMonth[m].ytd_cost += Number(r.ytd_cost || 0);
+        actualsByMonth[m].ytd_margin += Number(r.ytd_margin || 0);
       }
     }
 
@@ -872,7 +878,7 @@ router.get('/monthly-report', requireAuth, async (req, res) => {
       };
     });
 
-    // Calculate running cumulative actuals across completed months
+    // Calculate running cumulative actuals across completed months (Option B: strictly sum recorded months)
     let runningCumActual = 0;
     for (const item of monthsData) {
       if (item.has_actual) {
@@ -882,6 +888,16 @@ router.get('/monthly-report', requireAuth, async (req, res) => {
         item.cum_actual_sales = null;
       }
     }
+
+    // YTD Summary benchmarks (up to the latest month with live actuals)
+    const latestMonthData = monthsData.find(d => d.month === latestActualMonth);
+    const ytdActualSales = latestMonthData ? (latestMonthData.cum_actual_sales || 0) : 0;
+    const ytdBudgetSales = latestMonthData ? (latestMonthData.cum_budget_sales || 0) : 0;
+    const ytdPriorSales = latestMonthData ? (latestMonthData.cum_prior_year_sales || 0) : 0;
+    const ytdVarBudget = Number((ytdActualSales - ytdBudgetSales).toFixed(2));
+    const ytdVarBudgetPct = ytdBudgetSales > 0 ? Number(((ytdVarBudget / ytdBudgetSales) * 100).toFixed(2)) : 0;
+    const ytdVarPrior = Number((ytdActualSales - ytdPriorSales).toFixed(2));
+    const ytdVarPriorPct = ytdPriorSales > 0 ? Number(((ytdVarPrior / ytdPriorSales) * 100).toFixed(2)) : 0;
 
     // 4. Line Chart Series (Simple line chart for Budget, YTD / Actual, and Last Year)
     const chartLabels = monthsData.map(d => d.month_name.slice(0, 3));
@@ -898,13 +914,17 @@ router.get('/monthly-report', requireAuth, async (req, res) => {
       latest_actual_month: latestActualMonth,
       months: monthsData,
       ytd_summary: {
-        actual_sales: Number(runningCumActual.toFixed(2)),
-        budget_sales: Number(cumBudget.toFixed(2)),
-        prior_year_sales: Number(cumPriorYear.toFixed(2)),
-        var_budget: Number((runningCumActual - cumBudget).toFixed(2)),
-        var_budget_pct: cumBudget > 0 ? Number((((runningCumActual - cumBudget) / cumBudget) * 100).toFixed(2)) : 0,
-        var_prior: Number((runningCumActual - cumPriorYear).toFixed(2)),
-        var_prior_pct: cumPriorYear > 0 ? Number((((runningCumActual - cumPriorYear) / cumPriorYear) * 100).toFixed(2)) : 0
+        latest_month: latestActualMonth,
+        latest_month_name: latestMonthData ? latestMonthData.month_name : 'August',
+        actual_sales: ytdActualSales,
+        budget_sales: ytdBudgetSales,
+        prior_year_sales: ytdPriorSales,
+        var_budget: ytdVarBudget,
+        var_budget_pct: ytdVarBudgetPct,
+        var_prior: ytdVarPrior,
+        var_prior_pct: ytdVarPriorPct,
+        full_year_budget: Number(cumBudget.toFixed(2)),
+        full_year_prior_sales: Number(cumPriorYear.toFixed(2))
       },
       chart_series: {
         labels: chartLabels,
